@@ -1,0 +1,2382 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>The Flying Dutchman — Precision Underwater Survey Pole</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0e0f13;
+    --surface: #18191f;
+    --surface-alt: #1e2028;
+    --border: #2a2c35;
+    --border-light: #323440;
+    --text-primary: #e8e9ed;
+    --text-secondary: #9a9daa;
+    --text-muted: #5c5f6e;
+    --accent: #4d8df7;
+    --accent-light: rgba(77,141,247,0.12);
+    --accent-hover: #3a7ae8;
+    --success: #3ecf6e;
+    --success-bg: rgba(62,207,110,0.1);
+    --warning: #f0b429;
+    --warning-bg: rgba(240,180,41,0.1);
+    --danger: #ef5350;
+    --danger-bg: rgba(239,83,80,0.1);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.4);
+    --shadow-lg: 0 12px 48px rgba(0,0,0,0.5);
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); font-family: 'DM Sans', -apple-system, sans-serif; color: var(--text-primary); overflow: hidden; -webkit-font-smoothing: antialiased; }
+
+  #toolbar { position: fixed; top: 0; left: 0; right: 0; height: 52px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 16px; gap: 8px; z-index: 20; }
+  .logo { display: flex; align-items: center; gap: 10px; margin-right: 8px; }
+  .logo-icon { width: 30px; height: 30px; background: var(--accent); border-radius: 7px; display: flex; align-items: center; justify-content: center; }
+  .logo-icon svg { width: 16px; height: 16px; }
+  .logo h1 { font-size: 14px; font-weight: 700; letter-spacing: 1.5px; }
+  .toolbar-divider { width: 1px; height: 22px; background: var(--border); margin: 0 4px; }
+
+  .status-badge { display: flex; align-items: center; gap: 6px; padding: 3px 10px 3px 7px; border-radius: 16px; font-size: 11px; font-weight: 500; background: var(--danger-bg); color: var(--danger); transition: all 0.3s; }
+  .status-badge.connected { background: var(--success-bg); color: var(--success); }
+  .status-badge.scanning { background: var(--warning-bg); color: var(--warning); }
+  #statusDot { width: 6px; height: 6px; border-radius: 50%; background: var(--danger); flex-shrink: 0; }
+  .status-badge.connected #statusDot { background: var(--success); }
+  .status-badge.scanning #statusDot { background: var(--warning); animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.3} }
+
+  .btn { padding: 6px 14px; border-radius: var(--radius-sm); font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; display: flex; align-items: center; gap: 5px; }
+  .btn svg { width: 13px; height: 13px; flex-shrink: 0; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-ghost { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
+  .btn-ghost:hover { background: var(--surface-alt); color: var(--text-primary); }
+  .toolbar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  #pointCounter { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 500; color: var(--accent); background: var(--accent-light); padding: 4px 10px; border-radius: 14px; }
+
+  #viewer { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; }
+
+  #left-panels { position: fixed; top: 62px; left: 14px; z-index: 10; display: flex; flex-direction: column; gap: 8px; max-height: calc(100vh - 76px); overflow-y: auto; scrollbar-width: none; }
+  #left-panels::-webkit-scrollbar { display: none; }
+
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 16px; box-shadow: var(--shadow-md); min-width: 210px; }
+  .panel h3 { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 6px; }
+  .panel h3 .dot { width: 5px; height: 5px; border-radius: 50%; }
+  .dot-blue { background: var(--accent); }
+  .dot-green { background: var(--success); }
+  .dot-orange { background: var(--warning); }
+  .dot-red { background: var(--danger); }
+  .dot-purple { background: #a78bfa; }
+
+  .stat-row { display: flex; justify-content: space-between; padding: 1.5px 0; }
+  .stat-label { color: var(--text-muted); font-weight: 500; font-size: 11px; }
+  .stat-value { color: var(--text-primary); font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 500; }
+  .stat-value.dim { color: var(--text-muted); }
+
+  .sensor-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; }
+  .sensor-sub { display: flex; flex-direction: column; align-items: center; padding: 3px 0; }
+  .sensor-sub .sub-label { font-size: 9px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 1px; }
+  .sensor-sub .sub-value { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 500; color: var(--text-primary); }
+  .sensor-sub .sub-value.dim { color: var(--text-muted); }
+  .section-label { font-size: 9px; font-weight: 600; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 2px; margin-top: 4px; }
+
+  #controls-help { position: fixed; top: 62px; right: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; font-size: 11px; line-height: 2.1; color: var(--text-muted); z-index: 10; box-shadow: var(--shadow-md); }
+  #controls-help kbd { display: inline-block; background: var(--surface-alt); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 500; min-width: 18px; text-align: center; }
+
+  #serial-log { position: fixed; bottom: 32px; left: 0; right: 0; height: 168px; background: var(--surface); border-top: 1px solid var(--border); font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted); z-index: 10; display: flex; flex-direction: column; }
+  #serial-log.hidden { display: none; }
+  #serial-log.hidden ~ #scan-tabs { bottom: 0; }
+
+  /* ── Scan Tabs — Excel-style bottom bar ── */
+  #scan-tabs { position: fixed; bottom: 0; left: 0; right: 0; height: 32px; background: var(--surface); border-top: 1px solid var(--border); display: flex; align-items: center; padding: 0 8px; gap: 2px; z-index: 15; }
+  .scan-tab { display: flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 6px 6px 0 0; font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 600; cursor: pointer; border: 1px solid transparent; border-bottom: none; color: var(--text-muted); background: transparent; position: relative; transition: all 0.15s; user-select: none; white-space: nowrap; flex-shrink: 0; }
+  .scan-tab:hover { background: var(--surface-alt); color: var(--text-secondary); }
+  .scan-tab.active { background: var(--surface-alt); color: var(--text-primary); border-color: var(--border); }
+  .scan-tab .tab-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .scan-tab .tab-pts { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--text-muted); }
+  .scan-tab .tab-close { font-size: 11px; color: var(--text-muted); cursor: pointer; margin-left: 2px; padding: 0 2px; border-radius: 3px; }
+  .scan-tab .tab-close:hover { background: var(--danger-bg); color: var(--danger); }
+  .scan-tab .tab-filter { font-size: 9px; color: var(--text-muted); cursor: pointer; padding: 0 3px; border-radius: 3px; }
+  .scan-tab .tab-filter:hover { background: var(--accent-light); color: var(--accent); }
+  .tab-add { padding: 4px 10px; font-size: 14px; color: var(--text-muted); cursor: pointer; border: none; background: none; border-radius: 4px; font-weight: 600; }
+  .tab-add:hover { background: var(--surface-alt); color: var(--text-primary); }
+  .tab-spacer { flex: 1; }
+  .tab-backend { font-size: 10px; color: var(--text-muted); display: flex; align-items: center; gap: 4px; padding-right: 8px; }
+  .tab-backend .dot { width: 5px; height: 5px; border-radius: 50%; }
+
+  /* ── Filter Panel (popup like graph) ── */
+  #filter-panel { position: fixed; top: 62px; right: 14px; width: 280px; max-height: calc(100vh - 80px); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-lg); z-index: 18; overflow-y: auto; display: none; scrollbar-width: thin; }
+  #filter-panel.open { display: block; }
+  .fp-header { padding: 8px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .fp-title { font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-muted); }
+  .fp-close { background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 14px; padding: 2px 6px; border-radius: 4px; }
+  .fp-close:hover { background: var(--surface-alt); color: var(--text-primary); }
+  .fp-section { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .fp-section:last-child { border-bottom: none; }
+  .fp-section-title { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+  .fp-section-title .dot { width: 5px; height: 5px; border-radius: 50%; }
+  .fp-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .fp-label { font-size: 11px; color: var(--text-secondary); font-weight: 500; }
+  .fp-val { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--accent); min-width: 32px; text-align: right; }
+  .fp-slider { width: 90px; height: 4px; -webkit-appearance: none; appearance: none; background: var(--border); border-radius: 2px; outline: none; }
+  .fp-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); cursor: pointer; }
+  .fp-run { width: 100%; padding: 5px 0; border-radius: var(--radius-sm); font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--surface-alt); color: var(--text-secondary); margin-top: 6px; transition: all 0.15s; }
+  .fp-run:hover { background: var(--accent-light); color: var(--accent); border-color: var(--accent); }
+  .fp-run:disabled { opacity: 0.35; cursor: not-allowed; }
+  .fp-stat { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-muted); margin-top: 4px; }
+
+  /* ── SLAM Modal ── */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 50; display: none; align-items: center; justify-content: center; backdrop-filter: blur(3px); }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; min-width: 400px; max-width: 520px; box-shadow: var(--shadow-lg); }
+  .modal h2 { font-size: 14px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .modal h2 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+  .modal label { font-size: 11px; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 4px; margin-top: 12px; }
+  .modal select { width: 100%; padding: 8px 10px; background: var(--surface-alt); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-family: 'DM Sans', sans-serif; font-size: 12px; outline: none; }
+  .modal select:focus { border-color: var(--accent); }
+  .modal-btns { display: flex; gap: 8px; margin-top: 20px; justify-content: flex-end; }
+  .modal-result { margin-top: 16px; padding: 12px; background: var(--surface-alt); border-radius: var(--radius-sm); font-family: 'JetBrains Mono', monospace; font-size: 11px; display: none; }
+  .modal-result.show { display: block; }
+  .modal-result .mr-label { font-size: 9px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px; }
+  .modal-result .mr-matrix { color: var(--accent); white-space: pre; line-height: 1.6; }
+  .modal-result .mr-val { color: var(--success); }
+  .log-header { position: sticky; top: 0; background: var(--surface); border-bottom: 1px solid var(--border); padding: 7px 14px; font-family: 'DM Sans', sans-serif; font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-muted); display: flex; align-items: center; justify-content: space-between; }
+  .log-header button { background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 14px; padding: 2px 6px; border-radius: 4px; }
+  .log-header button:hover { background: var(--surface-alt); color: var(--text-primary); }
+  #log-content { padding: 6px 14px; overflow-y: auto; flex: 1; }
+  #serial-log .data-line { color: var(--success); }
+  #serial-log .info-line { color: var(--text-muted); }
+  #serial-log .header-line { color: var(--accent); font-weight: 500; }
+  #serial-log .sensor-line { color: var(--warning); opacity: 0.7; }
+  #serial-log .boot-line { color: #a78bfa; }
+
+  .drop-overlay { position: fixed; inset: 0; background: rgba(77,141,247,0.06); border: 3px dashed var(--accent); border-radius: 12px; margin: 8px; display: none; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(4px); }
+  .drop-overlay.active { display: flex; }
+  .drop-overlay span { background: var(--surface); padding: 14px 28px; border-radius: var(--radius); font-weight: 600; color: var(--accent); box-shadow: var(--shadow-lg); font-size: 14px; }
+
+  #tooltip { position: fixed; pointer-events: none; background: var(--surface); border: 1px solid var(--border-light); border-radius: var(--radius-sm); padding: 6px 10px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-primary); box-shadow: var(--shadow-md); z-index: 30; display: none; white-space: nowrap; }
+  #tooltip .tt-label { color: var(--text-muted); font-size: 9px; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 2px; }
+  #tooltip .tt-row { display: flex; gap: 10px; }
+  #tooltip .tt-axis { color: var(--text-secondary); }
+  #tooltip .tt-val { color: var(--accent); font-weight: 500; }
+
+  #mini-graph { position: fixed; bottom: 14px; right: 14px; width: 320px; height: 200px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-md); z-index: 10; display: flex; flex-direction: column; overflow: hidden; }
+  #mini-graph .mg-header { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; border-bottom: 1px solid var(--border); }
+  #mini-graph .mg-title { font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--text-muted); }
+  #mini-graph .mg-toggles { display: flex; gap: 3px; }
+  #mini-graph .mg-btn { padding: 2px 8px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--text-muted); transition: all 0.15s; }
+  #mini-graph .mg-btn.active { background: var(--accent-light); color: var(--accent); border-color: var(--accent); }
+  #mini-graph .mg-btn:hover:not(.active) { background: var(--surface-alt); color: var(--text-secondary); }
+  #mini-graph canvas { flex: 1; width: 100%; }
+  #mini-graph .mg-legend { display: flex; gap: 10px; padding: 4px 10px; border-top: 1px solid var(--border); }
+  #mini-graph .mg-leg-item { display: flex; align-items: center; gap: 4px; font-size: 9px; font-weight: 500; color: var(--text-muted); }
+  #mini-graph .mg-leg-color { width: 12px; height: 2px; border-radius: 1px; }
+  #mini-graph .mg-close { background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 13px; padding: 0 4px; border-radius: 4px; line-height: 1; }
+  #mini-graph .mg-close:hover { background: var(--surface-alt); color: var(--text-primary); }
+
+  .baud-select { background: var(--surface-alt); color: var(--text-secondary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 4px 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; cursor: pointer; outline: none; }
+  .baud-select:hover { border-color: var(--border-light); color: var(--text-primary); }
+  .baud-select option { background: var(--surface); }
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <div class="logo">
+    <div class="logo-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="3"/><line x1="12" y1="8" x2="12" y2="21"/><line x1="8" y1="21" x2="16" y2="21"/><path d="M5 15c2-2 4-3 7-3s5 1 7 3"/></svg></div>
+    <h1 style="font-size:12px;line-height:1.2">THE FLYING DUTCHMAN<span style="display:block;font-size:8px;font-weight:500;letter-spacing:0.5px;color:var(--text-muted)">Precision Underwater Survey Pole</span></h1>
+  </div>
+  <div class="toolbar-divider"></div>
+  <div class="status-badge" id="statusBadge"><div id="statusDot"></div><span id="statusText">Disconnected</span></div>
+  <div class="toolbar-divider"></div>
+  <select class="baud-select" id="baudRate">
+    <option value="9600">9600</option>
+    <option value="19200">19200</option>
+    <option value="38400">38400</option>
+    <option value="57600">57600</option>
+    <option value="115200" selected>115200</option>
+    <option value="230400">230400</option>
+    <option value="460800">460800</option>
+    <option value="921600">921600</option>
+  </select>
+  <button class="btn btn-primary" id="btnConnect" onclick="connectSerial()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+    <span>Connect</span>
+  </button>
+  <div class="toolbar-right">
+    <button class="btn btn-ghost" onclick="toggleLog()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Log</button>
+    <button class="btn btn-ghost" onclick="toggleMiniGraph()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Graph</button>
+    <button class="btn btn-ghost" onclick="clearPoints()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>Clear</button>
+    <button class="btn btn-ghost" id="btnFilters" onclick="toggleFilterPanel()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>Filters</button>
+    <button class="btn btn-ghost" onclick="document.getElementById('fileImport').click()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Import</button>
+    <input type="file" id="fileImport" accept=".csv,.txt" style="display:none" onchange="importCSV(this)">
+    <button class="btn btn-ghost" id="btnResume" onclick="resumeScan()" disabled title="Send last pan/tilt to MCU to resume scan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>Resume</button>
+    <button class="btn btn-primary" id="btnExport" onclick="exportCSV()" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export</button>
+    <div class="toolbar-divider"></div>
+    <button class="btn btn-ghost" id="btnSave" onclick="saveScan()" disabled title="Save current points as a named scan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>Save</button>
+    <button class="btn btn-ghost" id="btnICP" onclick="runICP()" disabled title="ICP — align last 2 saved scans"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/></svg>ICP</button>
+    <button class="btn btn-ghost" id="btnSLAM" onclick="runSLAM()" disabled title="SLAM — align all saved scans"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>SLAM</button>
+    <button class="btn btn-ghost" id="btnXLSX" onclick="exportXLSX()" disabled title="Export all scans to Excel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>XLSX</button>
+    <div class="toolbar-divider"></div>
+    <span id="pointCounter">0 pts</span>
+  </div>
+</div>
+
+<div id="left-panels">
+  <div class="panel">
+    <h3><span class="dot dot-blue"></span>Scan Data</h3>
+    <div class="stat-row"><span class="stat-label">Points</span><span class="stat-value" id="sPoints">0</span></div>
+    <div class="stat-row"><span class="stat-label">X</span><span class="stat-value" id="sX">—</span></div>
+    <div class="stat-row"><span class="stat-label">Y</span><span class="stat-value" id="sY">—</span></div>
+    <div class="stat-row"><span class="stat-label">Z</span><span class="stat-value" id="sZ">—</span></div>
+    <div class="stat-row"><span class="stat-label">Range</span><span class="stat-value" id="sRange">—</span></div>
+  </div>
+  <div class="panel">
+    <h3><span class="dot dot-green"></span>Pan / Tilt</h3>
+    <div class="stat-row"><span class="stat-label">Pan</span><span class="stat-value dim" id="rPan">—</span></div>
+    <div class="stat-row"><span class="stat-label">Tilt</span><span class="stat-value dim" id="rTilt">—</span></div>
+  </div>
+  <div class="panel">
+    <h3><span class="dot dot-orange"></span>LiDAR · VL53L1X</h3>
+    <div class="stat-row"><span class="stat-label">Range</span><span class="stat-value dim" id="rLidar">—</span></div>
+    <div class="stat-row"><span class="stat-label">Status</span><span class="stat-value dim" id="rLidarStatus">—</span></div>
+  </div>
+  <div class="panel">
+    <h3><span class="dot dot-purple"></span>IMU · ICM-20948</h3>
+    <div class="section-label">GYRO (°/s)</div>
+    <div class="sensor-grid">
+      <div class="sensor-sub"><span class="sub-label">X</span><span class="sub-value dim" id="rGx">—</span></div>
+      <div class="sensor-sub"><span class="sub-label">Y</span><span class="sub-value dim" id="rGy">—</span></div>
+      <div class="sensor-sub"><span class="sub-label">Z</span><span class="sub-value dim" id="rGz">—</span></div>
+    </div>
+    <div class="section-label">ACCEL (g)</div>
+    <div class="sensor-grid">
+      <div class="sensor-sub"><span class="sub-label">X</span><span class="sub-value dim" id="rAx">—</span></div>
+      <div class="sensor-sub"><span class="sub-label">Y</span><span class="sub-value dim" id="rAy">—</span></div>
+      <div class="sensor-sub"><span class="sub-label">Z</span><span class="sub-value dim" id="rAz">—</span></div>
+    </div>
+    <div class="section-label">MAG (µT)</div>
+    <div class="sensor-grid">
+      <div class="sensor-sub"><span class="sub-label">X</span><span class="sub-value dim" id="rMx">—</span></div>
+      <div class="sensor-sub"><span class="sub-label">Y</span><span class="sub-value dim" id="rMy">—</span></div>
+      <div class="sensor-sub"><span class="sub-label">Z</span><span class="sub-value dim" id="rMz">—</span></div>
+    </div>
+  </div>
+  <div class="panel">
+    <h3><span class="dot dot-green"></span>EKF · Orientation</h3>
+    <div class="sensor-grid">
+      <div class="sensor-sub"><span class="sub-label">Roll</span><span class="sub-value dim" id="rEkfRoll">—</span></div>
+      <div class="sensor-sub"><span class="sub-label">Pitch</span><span class="sub-value dim" id="rEkfPitch">—</span></div>
+      <div class="sensor-sub"><span class="sub-label">Yaw</span><span class="sub-value dim" id="rEkfYaw">—</span></div>
+    </div>
+    <div class="section-label">ACCEL ANG (°)</div>
+    <div class="sensor-grid">
+      <div class="sensor-sub"><span class="sub-label">Roll</span><span class="sub-value dim" id="rAccelRoll">—</span></div>
+      <div class="sensor-sub"><span class="sub-label">Pitch</span><span class="sub-value dim" id="rAccelPitch">—</span></div>
+      <div class="sensor-sub"><span class="sub-label"></span><span class="sub-value dim"></span></div>
+    </div>
+    <div class="section-label">GYRO ANG (°)</div>
+    <div class="sensor-grid">
+      <div class="sensor-sub"><span class="sub-label">Roll</span><span class="sub-value dim" id="rGyroRoll">—</span></div>
+      <div class="sensor-sub"><span class="sub-label">Pitch</span><span class="sub-value dim" id="rGyroPitch">—</span></div>
+      <div class="sensor-sub"><span class="sub-label">Yaw</span><span class="sub-value dim" id="rGyroYaw">—</span></div>
+    </div>
+  </div>
+  <div class="panel">
+    <h3><span class="dot dot-red"></span>GPS · NEO-M8M</h3>
+    <div class="stat-row"><span class="stat-label">Lat</span><span class="stat-value dim" id="rLat">—</span></div>
+    <div class="stat-row"><span class="stat-label">Lon</span><span class="stat-value dim" id="rLon">—</span></div>
+    <div class="stat-row"><span class="stat-label">Alt</span><span class="stat-value dim" id="rAlt">—</span></div>
+    <div class="stat-row"><span class="stat-label">Sats</span><span class="stat-value dim" id="rSats">—</span></div>
+    <div class="stat-row"><span class="stat-label">Fix</span><span class="stat-value dim" id="rFix">—</span></div>
+  </div>
+</div>
+
+<div id="controls-help">
+  <kbd>Drag</kbd> Rotate<br>
+  <kbd>Scroll</kbd> Zoom<br>
+  <kbd>Right</kbd> Pan<br>
+  <kbd>Hover</kbd> Inspect<br>
+  <kbd>R</kbd> Reset<br>
+  <kbd>L</kbd> Log
+</div>
+<div style="position:fixed;top:230px;right:14px;z-index:5;font-size:20px;font-weight:700;letter-spacing:3px;color:rgba(255,255,255,0.06);text-align:left;line-height:2;pointer-events:none">
+  TARAN<br>BASTIAAN<br>MANJINDER
+</div>
+
+<div id="filter-panel">
+  <div class="fp-header">
+    <span class="fp-title">Filters</span>
+    <span id="fpTarget" style="font-size:10px;color:var(--accent)">No scan selected</span>
+    <button class="fp-run" onclick="fpRevert()" id="fpRevertBtn" style="width:auto;padding:2px 10px;margin:0;font-size:10px" disabled>↩ Revert</button>
+    <button class="fp-close" onclick="toggleFilterPanel()">&#x2715;</button>
+  </div>
+
+  <div class="fp-section">
+    <div class="fp-section-title"><div class="dot" style="background:var(--success)"></div>SOR — Ring-Adaptive</div>
+    <div class="fp-row"><span class="fp-label">K neighbors</span><input type="range" class="fp-slider" id="fpSorK" min="4" max="20" value="8" oninput="document.getElementById('fpSorKv').textContent=this.value"><span class="fp-val" id="fpSorKv">8</span></div>
+    <div class="fp-row"><span class="fp-label">Std multiplier</span><input type="range" class="fp-slider" id="fpSorStd" min="5" max="30" value="10" oninput="document.getElementById('fpSorStdv').textContent=(this.value/10).toFixed(1)"><span class="fp-val" id="fpSorStdv">1.0</span></div>
+    <button class="fp-run" onclick="fpRunSOR()">Run SOR</button>
+    <div class="fp-stat" id="fpSorStat"></div>
+  </div>
+
+  <div class="fp-section">
+    <div class="fp-section-title"><div class="dot" style="background:#ef5350"></div>Sigma Filter <span style="font-size:8px;color:var(--text-muted);font-weight:400;letter-spacing:0">(needs firmware sigma)</span></div>
+    <div class="fp-row"><span class="fp-label">Max sigma (mm)</span><input type="range" class="fp-slider" id="fpSigmaMax" min="1" max="20" value="6" oninput="document.getElementById('fpSigmaMaxv').textContent=this.value+'mm'"><span class="fp-val" id="fpSigmaMaxv">6mm</span></div>
+    <button class="fp-run" id="fpSigmaBtn" onclick="fpRunSigmaFilter()">Run Sigma Filter</button>
+    <div class="fp-stat" id="fpSigmaStat"></div>
+  </div>
+
+  <div class="fp-section">
+    <div class="fp-section-title"><div class="dot" style="background:#fb923c"></div>Range Consistency <span style="font-size:8px;color:var(--text-muted);font-weight:400;letter-spacing:0">(estimates pixel mixing)</span></div>
+    <div class="fp-row"><span class="fp-label">Range spread (mm)</span><input type="range" class="fp-slider" id="fpRCSpread" min="5" max="100" value="30" oninput="document.getElementById('fpRCSpreadv').textContent=this.value+'mm'"><span class="fp-val" id="fpRCSpreadv">30mm</span></div>
+    <div class="fp-row"><span class="fp-label">Gap ratio</span><input type="range" class="fp-slider" id="fpRCGap" min="2" max="10" value="4" oninput="document.getElementById('fpRCGapv').textContent=(this.value/10).toFixed(1)"><span class="fp-val" id="fpRCGapv">0.4</span></div>
+    <button class="fp-run" onclick="fpRunRangeConsistency()">Run Range Consistency</button>
+    <div class="fp-stat" id="fpRCStat"></div>
+  </div>
+
+  <div class="fp-section">
+    <div class="fp-section-title"><div class="dot" style="background:#60a5fa"></div>Ring-Aware Smooth</div>
+    <div class="fp-row"><span class="fp-label">Ring window</span><input type="range" class="fp-slider" id="fpRingW" min="2" max="20" value="5" oninput="document.getElementById('fpRingWv').textContent=this.value"><span class="fp-val" id="fpRingWv">5</span></div>
+    <div class="fp-row"><span class="fp-label">Cross-ring blend</span><input type="range" class="fp-slider" id="fpRingCross" min="0" max="10" value="5" oninput="document.getElementById('fpRingCrossv').textContent=(this.value/10).toFixed(1)"><span class="fp-val" id="fpRingCrossv">0.5</span></div>
+    <button class="fp-run" onclick="fpRunRingSmooth()">Run Ring Smooth</button>
+    <div class="fp-stat" id="fpRingStat"></div>
+  </div>
+
+  <div class="fp-section">
+    <div class="fp-section-title"><div class="dot" style="background:#f472b6"></div>Voxel Downsample</div>
+    <div class="fp-row"><span class="fp-label">Voxel size (mm)</span><input type="range" class="fp-slider" id="fpVoxel" min="1" max="30" value="5" oninput="document.getElementById('fpVoxelv').textContent=this.value+'mm'"><span class="fp-val" id="fpVoxelv">5mm</span></div>
+    <button class="fp-run" onclick="fpRunVoxel()">Run Voxel Downsample</button>
+    <div class="fp-stat" id="fpVoxelStat"></div>
+  </div>
+
+  <div class="fp-section">
+    <div class="fp-section-title"><div class="dot" style="background:var(--accent)"></div>① Normals + Curvature</div>
+    <div class="fp-row"><span class="fp-label">K neighbors</span><input type="range" class="fp-slider" id="fpNormK" min="5" max="50" value="15" oninput="document.getElementById('fpNormKv').textContent=this.value"><span class="fp-val" id="fpNormKv">15</span></div>
+    <button class="fp-run" onclick="fpRunNormals()">Run Normals</button>
+    <div class="fp-stat" id="fpNormStat"></div>
+  </div>
+
+  <div class="fp-section">
+    <div class="fp-section-title"><div class="dot" style="background:var(--warning)"></div>② RANSAC Planes</div>
+    <div class="fp-row"><span class="fp-label">Min points/plane</span><input type="range" class="fp-slider" id="fpRansacMin" min="20" max="500" value="100" step="10" oninput="document.getElementById('fpRansacMinv').textContent=this.value"><span class="fp-val" id="fpRansacMinv">100</span></div>
+    <div class="fp-row"><span class="fp-label">Max planes</span><input type="range" class="fp-slider" id="fpRansacMax" min="2" max="30" value="20" oninput="document.getElementById('fpRansacMaxv').textContent=this.value"><span class="fp-val" id="fpRansacMaxv">20</span></div>
+    <button class="fp-run" onclick="fpRunRANSAC()">Run RANSAC</button>
+    <div class="fp-stat" id="fpRansacStat"></div>
+  </div>
+
+  <div class="fp-section">
+    <div class="fp-section-title"><div class="dot" style="background:#a78bfa"></div>③ Edge Lines</div>
+    <div class="fp-row"><span class="fp-label">Min angle (°)</span><input type="range" class="fp-slider" id="fpEdgeAngle" min="5" max="45" value="10" oninput="document.getElementById('fpEdgeAnglev').textContent=this.value+'°'"><span class="fp-val" id="fpEdgeAnglev">10°</span></div>
+    <button class="fp-run" onclick="fpRunEdges()">Run Edges</button>
+    <button class="fp-run" onclick="clearEdgeLines();logLine('Edge lines cleared','info')" style="background:transparent;margin-top:2px">Clear edge lines</button>
+    <div class="fp-stat" id="fpEdgeStat"></div>
+  </div>
+
+  <div class="fp-section">
+    <div class="fp-section-title"><div class="dot" style="background:var(--danger)"></div>④ Reproject</div>
+    <button class="fp-run" onclick="fpRunReproject()">Run Reproject</button>
+    <div class="fp-stat" id="fpReprojStat"></div>
+  </div>
+
+  <div class="fp-section">
+    <button class="fp-run" onclick="fpResetColors()" style="background:transparent">🎨 Reset colors</button>
+  </div>
+</div>
+
+<div id="serial-log">
+  <div class="log-header"><span>Serial Log</span><button onclick="toggleLog()">&#x2715;</button></div>
+  <div id="log-content"></div>
+</div>
+
+<div class="drop-overlay" id="dropOverlay"><span>Drop CSV to load scan</span></div>
+<div id="mini-graph">
+  <div class="mg-header">
+    <span class="mg-title">Angle · Raw vs EKF (°)</span>
+    <div class="mg-toggles">
+      <button class="mg-btn active" onclick="setGraphAxis(0)">Roll</button>
+      <button class="mg-btn" onclick="setGraphAxis(1)">Pitch</button>
+      <button class="mg-btn" onclick="setGraphAxis(2)">Yaw</button>
+    </div>
+    <button class="mg-close" onclick="toggleMiniGraph()">&#x2715;</button>
+  </div>
+  <canvas id="mgCanvas"></canvas>
+  <div class="mg-legend">
+    <div class="mg-leg-item"><div class="mg-leg-color" style="background:#ef5350"></div>Accel Ang</div>
+    <div class="mg-leg-item"><div class="mg-leg-color" style="background:#f0b429"></div>Gyro Ang</div>
+    <div class="mg-leg-item"><div class="mg-leg-color" style="background:#3ecf6e"></div>EKF</div>
+  </div>
+</div>
+
+<div id="tooltip"><div class="tt-label">POINT</div><div class="tt-row"><span class="tt-axis">X</span><span class="tt-val" id="ttX">0</span><span class="tt-axis">Y</span><span class="tt-val" id="ttY">0</span><span class="tt-axis">Z</span><span class="tt-val" id="ttZ">0</span></div></div>
+<div id="scan-tabs">
+  <button class="tab-add" onclick="saveScan()" title="Save current scan as a new tab">+</button>
+  <div id="tabContainer" style="display:flex;align-items:center;gap:2px;overflow-x:auto;flex:1"></div>
+  <div class="tab-backend"><div class="dot" id="backendDot" style="background:var(--danger)"></div><span id="backendStatus">Offline</span></div>
+</div>
+
+<!-- SLAM Modal -->
+<div class="modal-overlay" id="slamModal">
+  <div class="modal">
+    <h2><div class="dot"></div>SLAM — Scan Alignment</h2>
+    <label>Target (fixed scan)</label>
+    <select id="slamTarget"></select>
+    <label>Source (scan to move)</label>
+    <select id="slamSource"></select>
+    <label>Mode</label>
+    <select id="slamMode" onchange="updateSlamModeUI()">
+      <option value="icp">ICP — align 2 scans</option>
+      <option value="slam">SLAM — align all scans sequentially</option>
+    </select>
+    <div class="modal-btns">
+      <button class="btn btn-ghost" onclick="closeSlamModal()">Cancel</button>
+      <button class="btn btn-primary" id="btnSlamRun" onclick="executeSLAM()">Run Alignment</button>
+    </div>
+    <div class="modal-result" id="slamResult">
+      <div class="mr-label">Result</div>
+      <div id="slamResultContent"></div>
+    </div>
+  </div>
+</div>
+
+<div id="viewer"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+<script>
+// ============================================================================
+// THE FLYING DUTCHMAN — Precision Underwater Survey Pole
+// ============================================================================
+// v10 CHANGES:
+//   [FIX 16] Serial uses fire-and-forget pipeTo (matches working v2)
+//            Removed break-retry logic that caused infinite reconnect loops
+//   [FIX 17] Tera Term style log — EVERY line logged, always visible
+//            Log first, parse second. Color-coded by line type.
+// INHERITED v9 FIXES:
+//   [1] Pre-allocated typed buffers — no GC thrashing from array growth
+//   [2] Persistent geometry — no dispose/recreate cycle, just update attributes
+//   [3] Deferred color gradient — uniform color during scan, Z-gradient on completion
+//   [4] Debounced geometry sync — max 4 updates/sec during scan
+// MODERATE FIXES:
+//   [5] Configurable baud rate selector (default 115200 instead of 9600)
+//   [6] Raycasting disabled during active scan
+//   [7] Graph uses rAF + dirty flag instead of blind setInterval
+//   [8] Raycaster threshold scales with zoom level
+// ARCHITECTURAL FIXES:
+//   [9] DOM elements cached at init — no getElementById in hot loops
+//   [10] Serial disconnect auto-recovery with state reset
+//   [11] Scene background matches dark UI theme
+//   [12] Keyboard shortcuts guarded against input elements
+//   [13] Export CSV includes range column
+//   [14] pipeTo promise properly caught
+// ============================================================================
+
+// ── Pre-allocated buffer config ──
+const INITIAL_CAPACITY = 20000;
+const GROW_FACTOR = 2;
+const MAX_POINTS = 500000;
+const UNIFORM_COLOR = [0.30, 0.55, 0.95];
+
+let scene, camera, renderer;
+let pointCloud = null;
+let pointGeometry = null;
+let pointMaterial = null;
+
+// ── Typed buffer management ──
+let posBuffer = new Float32Array(INITIAL_CAPACITY * 3);
+let colBuffer = new Float32Array(INITIAL_CAPACITY * 3);
+let rangeBuffer = new Float32Array(INITIAL_CAPACITY);
+let sigmaBuffer = new Float32Array(INITIAL_CAPACITY);  // sigma per point (0 = not available)
+let panTiltBuffer = new Float32Array(INITIAL_CAPACITY * 2);  // pan,tilt per point
+let bufferCapacity = INITIAL_CAPACITY;
+let pointCount = 0;
+let lastScanPan = null, lastScanTilt = null;  // track last scan position for resume
+
+let serialPort = null, reader = null, reading = false, lineBuffer = '', headerSeen = false;
+let azimuth = 0.8, elevation = 0.5, panX = 0, panY = 0, panZ = 0, zoom = 2000;
+let dragging = false, dragBtn = -1, prevMouse = {x:0,y:0};
+let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity,minZ=Infinity,maxZ=-Infinity,minR=Infinity,maxR=-Infinity;
+let centroidX=0, centroidY=0, centroidZ=0;
+
+let raycaster = new THREE.Raycaster();
+raycaster.params.Points.threshold = 0.05;
+let mouse = new THREE.Vector2();
+
+let sensors = {pan:null,tilt:null,range:null,lidarStatus:'waiting',gx:null,gy:null,gz:null,ax:null,ay:null,az:null,mx:null,my:null,mz:null,lat:null,lon:null,alt:null,sats:null,fix:'No fix',ekfRoll:null,ekfPitch:null,ekfYaw:null,accelAngRoll:null,accelAngPitch:null,gyroAngRoll:null,gyroAngPitch:null,gyroAngYaw:null};
+
+// ── [FIX 9] Cached DOM references ──
+let DOM = {};
+function cacheDOMRefs() {
+  const ids = [
+    'sPoints','sX','sY','sZ','sRange','pointCounter',
+    'rPan','rTilt','rLidar','rLidarStatus',
+    'rGx','rGy','rGz','rAx','rAy','rAz','rMx','rMy','rMz',
+    'rEkfRoll','rEkfPitch','rEkfYaw',
+    'rAccelRoll','rAccelPitch','rGyroRoll','rGyroPitch','rGyroYaw',
+    'rLat','rLon','rAlt','rSats','rFix',
+    'statusBadge','statusText','statusDot',
+    'btnConnect','btnExport','btnResume','btnFilters',
+    'btnSave','btnICP','btnSLAM','btnXLSX',
+    'tabContainer','backendStatus','backendDot',
+    'slamModal','slamTarget','slamSource','slamMode','slamResult','slamResultContent','btnSlamRun',
+    'filter-panel','fpTarget',
+    'fpSorK','fpSorStd','fpSorStat',
+    'fpNormK','fpNormStat',
+    'fpRansacMin','fpRansacMax','fpRansacStat',
+    'fpEdgeAngle','fpEdgeStat',
+    'fpReprojStat',
+    'log-content','serial-log','dropOverlay',
+    'tooltip','ttX','ttY','ttZ',
+    'viewer','mgCanvas','mini-graph','baudRate'
+  ];
+  ids.forEach(id => { DOM[id] = document.getElementById(id); });
+}
+
+// ── [FIX 1] Buffer growth — amortized doubling, no per-point alloc ──
+function growBuffers() {
+  const newCap = Math.min(bufferCapacity * GROW_FACTOR, MAX_POINTS);
+  if (newCap <= bufferCapacity) {
+    logLine('MAX CAPACITY reached (' + MAX_POINTS + ')', 'info');
+    return false;
+  }
+  const newPos = new Float32Array(newCap * 3);
+  const newCol = new Float32Array(newCap * 3);
+  const newRng = new Float32Array(newCap);
+  const newSig = new Float32Array(newCap);
+  const newPT  = new Float32Array(newCap * 2);
+  newPos.set(posBuffer.subarray(0, pointCount * 3));
+  newCol.set(colBuffer.subarray(0, pointCount * 3));
+  newRng.set(rangeBuffer.subarray(0, pointCount));
+  newSig.set(sigmaBuffer.subarray(0, pointCount));
+  newPT.set(panTiltBuffer.subarray(0, pointCount * 2));
+  posBuffer = newPos;
+  colBuffer = newCol;
+  rangeBuffer = newRng;
+  sigmaBuffer = newSig;
+  panTiltBuffer = newPT;
+  bufferCapacity = newCap;
+  logLine('Buffer grown → ' + newCap + ' capacity', 'info');
+  return true;
+}
+
+// ── [FIX 1] O(1) point insertion into pre-allocated typed array ──
+function addPoint(x, y, z, r, pan, tilt, sigma) {
+  if (pointCount >= bufferCapacity) {
+    if (!growBuffers()) return;
+  }
+  const i3 = pointCount * 3;
+  const i2 = pointCount * 2;
+  posBuffer[i3] = x;
+  posBuffer[i3+1] = y;
+  posBuffer[i3+2] = z;
+  colBuffer[i3]   = UNIFORM_COLOR[0];
+  colBuffer[i3+1] = UNIFORM_COLOR[1];
+  colBuffer[i3+2] = UNIFORM_COLOR[2];
+  rangeBuffer[pointCount] = r;
+  sigmaBuffer[pointCount] = sigma !== undefined ? sigma : 0;
+  panTiltBuffer[i2] = pan !== undefined ? pan : 0;
+  panTiltBuffer[i2+1] = tilt !== undefined ? tilt : 0;
+  pointCount++;
+  // Incremental bounds tracking
+  if (x < minX) minX = x; if (x > maxX) maxX = x;
+  if (y < minY) minY = y; if (y > maxY) maxY = y;
+  if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+  if (r < minR) minR = r; if (r > maxR) maxR = r;
+}
+
+// ── [FIX 2] Sync geometry — update attributes in place, never dispose ──
+let geometryDirty = false;
+
+function syncGeometry() {
+  if (!pointGeometry || !geometryDirty) return;
+  geometryDirty = false;
+
+  const posAttr = pointGeometry.getAttribute('position');
+  const colAttr = pointGeometry.getAttribute('color');
+
+  // If buffers were reallocated (grew), swap the attribute arrays
+  if (posAttr.array !== posBuffer) {
+    pointGeometry.setAttribute('position', new THREE.BufferAttribute(posBuffer, 3));
+    pointGeometry.setAttribute('color', new THREE.BufferAttribute(colBuffer, 3));
+  } else {
+    posAttr.needsUpdate = true;
+    colAttr.needsUpdate = true;
+  }
+  pointGeometry.setDrawRange(0, pointCount);
+  pointGeometry.computeBoundingSphere();
+
+  // Update centroid
+  let sx=0, sy=0, sz=0;
+  for (let i=0; i<pointCount; i++) {
+    sx += posBuffer[i*3]; sy += posBuffer[i*3+1]; sz += posBuffer[i*3+2];
+  }
+  centroidX = sx/pointCount; centroidY = sy/pointCount; centroidZ = sz/pointCount;
+}
+
+// ── [FIX 3] Z-gradient color pass — runs ONCE when scan completes ──
+function applyColorGradient() {
+  if (pointCount === 0) return;
+  const zRange = maxZ - minZ;
+  for (let i=0; i<pointCount; i++) {
+    const z = posBuffer[i*3+2];
+    const t = zRange > 0 ? (z - minZ) / zRange : 0.5;
+    colBuffer[i*3]   = 0.08 + t * 0.85;
+    colBuffer[i*3+1] = 0.25 + (1 - Math.abs(t-0.5)*2) * 0.4;
+    colBuffer[i*3+2] = 0.75 - t * 0.6;
+  }
+  const colAttr = pointGeometry.getAttribute('color');
+  if (colAttr.array !== colBuffer) {
+    pointGeometry.setAttribute('color', new THREE.BufferAttribute(colBuffer, 3));
+  } else {
+    colAttr.needsUpdate = true;
+  }
+}
+
+// ── [FIX 4] Debounced rebuild — max 4x/sec during scan ──
+let rebuildTimer = null;
+let hasAutoFramed = false;
+function scheduleRebuild() {
+  if (rebuildTimer) return;
+  rebuildTimer = setTimeout(() => {
+    rebuildTimer = null;
+    geometryDirty = true;
+    syncGeometry();
+    updateStats();
+    // Auto-frame on first batch of points
+    if (!hasAutoFramed && pointCount > 10) {
+      hasAutoFramed = true;
+      autoFrameCamera();
+    }
+  }, 250);
+}
+
+// ── [FIX 18] Auto-frame camera to fit point cloud ──
+function autoFrameCamera() {
+  if (pointCount === 0) return;
+  // Center camera on centroid
+  panX = centroidX;
+  panY = centroidY;
+  panZ = centroidZ;
+  // Zoom to fit bounding box
+  const dx = maxX - minX, dy = maxY - minY, dz = maxZ - minZ;
+  const maxSpan = Math.max(dx, dy, dz, 0.01);
+  zoom = maxSpan * 1.2;
+  zoom = Math.max(0.3, Math.min(50000, zoom));
+  updateCamera();
+}
+
+// ── Scene init ──
+function initScene() {
+  scene = new THREE.Scene();
+  // [FIX 11] Dark background matching UI theme
+  scene.background = new THREE.Color(0x12131a);
+
+  camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.1, 100000);
+  camera.up.set(0, 0, 1);
+  renderer = new THREE.WebGLRenderer({antialias:true});
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  DOM['viewer'].appendChild(renderer.domElement);
+
+  // [FIX 2] Create geometry ONCE, reuse forever
+  pointGeometry = new THREE.BufferGeometry();
+  pointGeometry.setAttribute('position', new THREE.BufferAttribute(posBuffer, 3));
+  pointGeometry.setAttribute('color', new THREE.BufferAttribute(colBuffer, 3));
+  pointGeometry.setDrawRange(0, 0);
+
+  pointMaterial = new THREE.PointsMaterial({
+    size: 3, sizeAttenuation: false, vertexColors: true
+  });
+  pointCloud = new THREE.Points(pointGeometry, pointMaterial);
+  scene.add(pointCloud);
+
+  addGridAndAxes();
+  updateCamera();
+
+  // ── Mouse handlers ──
+  renderer.domElement.addEventListener('mousedown', e => {
+    dragging = true; dragBtn = e.button; prevMouse = {x:e.clientX, y:e.clientY};
+  });
+
+  renderer.domElement.addEventListener('mousemove', e => {
+    // [FIX 6] Skip raycasting entirely during active scan
+    if (!dragging && !reading) {
+      mouse.x = (e.clientX / innerWidth) * 2 - 1;
+      mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+      // [FIX 8] Scale threshold with zoom
+      raycaster.params.Points.threshold = 0.01 + zoom * 0.02;
+      raycaster.setFromCamera(mouse, camera);
+      if (pointCloud && pointCount > 0) {
+        const hits = raycaster.intersectObject(pointCloud);
+        const tt = DOM['tooltip'];
+        if (hits.length > 0) {
+          const p = hits[0].point;
+          tt.style.display = 'block';
+          tt.style.left = (e.clientX + 14) + 'px';
+          tt.style.top = (e.clientY - 10) + 'px';
+          DOM['ttX'].textContent = p.x.toFixed(4);
+          DOM['ttY'].textContent = p.y.toFixed(4);
+          DOM['ttZ'].textContent = p.z.toFixed(4);
+        } else { tt.style.display = 'none'; }
+      }
+      return;
+    }
+    if (!dragging) return;
+    const dx = e.clientX - prevMouse.x, dy = e.clientY - prevMouse.y;
+    if (dragBtn === 0) {
+      azimuth -= dx * 0.005;
+      elevation += dy * 0.005;
+      elevation = Math.max(-Math.PI/2+0.01, Math.min(Math.PI/2-0.01, elevation));
+    } else if (dragBtn === 2) {
+      const fwd = new THREE.Vector3();
+      camera.getWorldDirection(fwd);
+      const right = new THREE.Vector3().crossVectors(fwd, camera.up).normalize();
+      const up = new THREE.Vector3().crossVectors(right, fwd).normalize();
+      const scale = zoom * 0.002;
+      panX -= dx*scale*right.x + dy*scale*up.x;
+      panY -= dx*scale*right.y + dy*scale*up.y;
+      panZ -= dx*scale*right.z + dy*scale*up.z;
+    }
+    prevMouse = {x:e.clientX, y:e.clientY};
+    updateCamera();
+    DOM['tooltip'].style.display = 'none';
+  });
+
+  renderer.domElement.addEventListener('mouseup', () => { dragging = false; dragBtn = -1; });
+  renderer.domElement.addEventListener('wheel', e => {
+    zoom *= e.deltaY > 0 ? 1.1 : 0.9;
+    zoom = Math.max(0.1, Math.min(50000, zoom));
+    updateCamera();
+  });
+  renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
+
+  addEventListener('resize', () => {
+    camera.aspect = innerWidth/innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+
+  addEventListener('keydown', e => {
+    // [FIX 12] Guard against input/select elements
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    if (e.key==='r'||e.key==='R') { azimuth=0.8; elevation=0.5; panX=panY=panZ=0; zoom=2000; updateCamera(); }
+    if (e.key==='l'||e.key==='L') toggleLog();
+  });
+
+  animate();
+}
+
+function addGridAndAxes() {
+  // [FIX 11] Dark grid colors — scaled for mm-unit data
+  const gc1 = 0x2a2c35, gc2 = 0x1e2028;
+  const S = 2000; // 2000mm = 2m grid
+  const gridXY = new THREE.GridHelper(S, 20, gc1, gc2);
+  gridXY.rotation.x = Math.PI/2;
+  scene.add(gridXY);
+  const gridXZ = new THREE.GridHelper(S, 20, gc1, gc2);
+  gridXZ.rotation.z = Math.PI/2; gridXZ.rotation.x = Math.PI/2;
+  scene.add(gridXZ);
+  const gridYZ = new THREE.GridHelper(S, 20, gc1, gc2);
+  scene.add(gridYZ);
+
+  const L = S * 0.6;
+  [{d:[L,0,0],c:0xd93025},{d:[0,L,0],c:0x1e8e3e},{d:[0,0,L],c:0x1a73e8}].forEach(a => {
+    scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0),new THREE.Vector3(...a.d)]),new THREE.LineBasicMaterial({color:a.c})));
+    scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0),new THREE.Vector3(-a.d[0],-a.d[1],-a.d[2])]),new THREE.LineBasicMaterial({color:a.c,opacity:0.2,transparent:true})));
+  });
+  scene.add(new THREE.Mesh(new THREE.SphereGeometry(6,12,12),new THREE.MeshBasicMaterial({color:0x888888})));
+  for (let v=-S/2;v<=S/2;v+=S/10) {
+    if (Math.abs(v)<1) continue; const s=S*0.004;
+    scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(v,-s,0),new THREE.Vector3(v,s,0)]),new THREE.LineBasicMaterial({color:0xd93025,opacity:0.3,transparent:true})));
+    scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-s,v,0),new THREE.Vector3(s,v,0)]),new THREE.LineBasicMaterial({color:0x1e8e3e,opacity:0.3,transparent:true})));
+    scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,-s,v),new THREE.Vector3(0,s,v)]),new THREE.LineBasicMaterial({color:0x1a73e8,opacity:0.3,transparent:true})));
+  }
+}
+
+function updateCamera() {
+  const x = panX + zoom*Math.cos(elevation)*Math.cos(azimuth);
+  const y = panY + zoom*Math.cos(elevation)*Math.sin(azimuth);
+  const z = panZ + zoom*Math.sin(elevation);
+  camera.position.set(x, y, z);
+  camera.lookAt(panX, panY, panZ);
+}
+
+function animate() { requestAnimationFrame(animate); renderer.render(scene, camera); }
+
+function updateStats() {
+  DOM['sPoints'].textContent = pointCount;
+  DOM['pointCounter'].textContent = pointCount + ' pts';
+  if (pointCount > 0) {
+    DOM['sX'].textContent = minX.toFixed(1)+' → '+maxX.toFixed(1)+' mm';
+    DOM['sY'].textContent = minY.toFixed(1)+' → '+maxY.toFixed(1)+' mm';
+    DOM['sZ'].textContent = minZ.toFixed(1)+' → '+maxZ.toFixed(1)+' mm';
+    DOM['sRange'].textContent = Math.round(minR)+' → '+Math.round(maxR)+' mm';
+    DOM['btnExport'].disabled = false;
+    DOM['btnSave'].disabled = false;
+    if (DOM['btnXLSX']) DOM['btnXLSX'].disabled = !(scans.length > 0 || pointCount > 0);
+  }
+}
+
+// ── [FIX 9] Sensor display with cached refs ──
+function updateSensorDisplay() {
+  if (updateSensorDisplay._pending) return;
+  updateSensorDisplay._pending = true;
+  requestAnimationFrame(() => {
+    updateSensorDisplay._pending = false;
+    const fmt = (v,d,u) => v!==null ? parseFloat(v).toFixed(d)+(u||'') : '—';
+    DOM['rPan'].textContent = sensors.pan!==null ? sensors.pan+'°' : '—';
+    DOM['rTilt'].textContent = sensors.tilt!==null ? sensors.tilt+'°' : '—';
+    DOM['rLidar'].textContent = sensors.range!==null ? sensors.range+' mm' : '—';
+    DOM['rLidarStatus'].textContent = sensors.lidarStatus||'—';
+    DOM['rGx'].textContent=fmt(sensors.gx,2,'°/s'); DOM['rGy'].textContent=fmt(sensors.gy,2,'°/s'); DOM['rGz'].textContent=fmt(sensors.gz,2,'°/s');
+    DOM['rAx'].textContent=fmt(sensors.ax,3,'g'); DOM['rAy'].textContent=fmt(sensors.ay,3,'g'); DOM['rAz'].textContent=fmt(sensors.az,3,'g');
+    DOM['rMx'].textContent=fmt(sensors.mx,1); DOM['rMy'].textContent=fmt(sensors.my,1); DOM['rMz'].textContent=fmt(sensors.mz,1);
+    DOM['rEkfRoll'].textContent=fmt(sensors.ekfRoll,1,'°'); DOM['rEkfPitch'].textContent=fmt(sensors.ekfPitch,1,'°'); DOM['rEkfYaw'].textContent=fmt(sensors.ekfYaw,1,'°');
+    if(DOM['rAccelRoll']) { DOM['rAccelRoll'].textContent=fmt(sensors.accelAngRoll,2,'°'); DOM['rAccelPitch'].textContent=fmt(sensors.accelAngPitch,2,'°'); }
+    if(DOM['rGyroRoll']) { DOM['rGyroRoll'].textContent=fmt(sensors.gyroAngRoll,2,'°'); DOM['rGyroPitch'].textContent=fmt(sensors.gyroAngPitch,2,'°'); DOM['rGyroYaw'].textContent=fmt(sensors.gyroAngYaw,2,'°'); }
+    DOM['rLat'].textContent=fmt(sensors.lat,6); DOM['rLon'].textContent=fmt(sensors.lon,6);
+    DOM['rAlt'].textContent=fmt(sensors.alt,1,' m'); DOM['rSats'].textContent=sensors.sats!==null?sensors.sats:'—';
+    DOM['rFix'].textContent=sensors.fix||'—';
+    document.querySelectorAll('.stat-value,.sub-value').forEach(el => {
+      el.classList.toggle('dim', el.textContent==='—');
+    });
+  });
+}
+
+function parseSensorLine(line) {
+  if (line.startsWith('IMU:')) {
+    const p=line.substring(4).split(',');
+    if(p.length>=6){sensors.gx=p[0];sensors.gy=p[1];sensors.gz=p[2];sensors.ax=p[3];sensors.ay=p[4];sensors.az=p[5];updateSensorDisplay();}
+    return true;
+  }
+  if (line.startsWith('EKF:')) {
+    const p=line.substring(4).split(',');
+    if(p.length>=3){
+      const roll=parseFloat(p[0]),pitch=parseFloat(p[1]),yaw=parseFloat(p[2]);
+      sensors.ekfRoll=roll; sensors.ekfPitch=pitch; sensors.ekfYaw=yaw;
+      updateSensorDisplay();
+      pushGraphData('ekf',[roll,pitch,yaw]);
+    }
+    return true;
+  }
+  if (line.startsWith('ACCEL_ANG:')) {
+    const p=line.substring(10).split(',');
+    if(p.length>=3){
+      sensors.accelAngRoll=parseFloat(p[0]); sensors.accelAngPitch=parseFloat(p[1]);
+      pushGraphData('accel_ang',[parseFloat(p[0]),parseFloat(p[1]),parseFloat(p[2])]);
+      updateSensorDisplay();
+    }
+    return true;
+  }
+  if (line.startsWith('GYRO_ANG:')) {
+    const p=line.substring(9).split(',');
+    if(p.length>=3){
+      sensors.gyroAngRoll=parseFloat(p[0]); sensors.gyroAngPitch=parseFloat(p[1]); sensors.gyroAngYaw=parseFloat(p[2]);
+      pushGraphData('gyro_ang',[parseFloat(p[0]),parseFloat(p[1]),parseFloat(p[2])]);
+      updateSensorDisplay();
+    }
+    return true;
+  }
+  if (line.startsWith('MAG:')) { const p=line.substring(4).split(','); if(p.length>=3){sensors.mx=p[0];sensors.my=p[1];sensors.mz=p[2];updateSensorDisplay();}return true;}
+  if (line.startsWith('GPS:')) { const p=line.substring(4).split(','); if(p.length>=2){sensors.lat=p[0];sensors.lon=p[1];if(p[2])sensors.alt=p[2];if(p[3])sensors.sats=p[3];if(p[4])sensors.fix=p[4]==='1'?'3D Fix':p[4]==='2'?'2D Fix':'No fix';updateSensorDisplay();}return true;}
+  if (line.startsWith('LIDAR:')) { const p=line.substring(6).split(','); if(p.length>=1){sensors.range=p[0];sensors.lidarStatus=p.length>=2?(p[1]==='0'?'Valid':'Error '+p[1]):'Valid';updateSensorDisplay();}return true;}
+  if (line.startsWith('PAN_TILT:')) { const p=line.substring(9).split(','); if(p.length>=2){sensors.pan=parseFloat(p[0]);sensors.tilt=parseFloat(p[1]);updateSensorDisplay();}return true;}
+  return false;
+}
+
+// ── [FIX 7] Mini-graph — rAF + dirty flag, no blind setInterval ──
+const GRAPH_MAX = 200;
+let graphAxis = 0;
+let graphVisible = true;
+let graphDirty = false;
+let graphData = { accel_ang: [], gyro_ang: [], ekf: [] };
+let graphRAF = null;
+
+function pushGraphData(type, vals) {
+  graphData[type].push(vals);
+  if (graphData[type].length > GRAPH_MAX) graphData[type].shift();
+  graphDirty = true;
+  scheduleGraphDraw();
+}
+
+function scheduleGraphDraw() {
+  if (graphRAF || !graphVisible) return;
+  graphRAF = requestAnimationFrame(() => {
+    graphRAF = null;
+    if (graphDirty) { graphDirty = false; drawGraph(); }
+  });
+}
+
+function setGraphAxis(a) {
+  graphAxis = a;
+  document.querySelectorAll('#mini-graph .mg-btn').forEach((b,i) => b.classList.toggle('active', i===a));
+  graphDirty = true; scheduleGraphDraw();
+}
+
+function toggleMiniGraph() {
+  graphVisible = !graphVisible;
+  DOM['mini-graph'].style.display = graphVisible ? 'flex' : 'none';
+  if (graphVisible) { graphDirty = true; scheduleGraphDraw(); }
+}
+
+function drawGraph() {
+  const canvas = DOM['mgCanvas'];
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (canvas.width !== w*devicePixelRatio || canvas.height !== h*devicePixelRatio) {
+    canvas.width = w*devicePixelRatio; canvas.height = h*devicePixelRatio;
+  }
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+  ctx.clearRect(0,0,w,h);
+  const ai = graphAxis;
+  let allVals = [];
+  ['accel_ang','gyro_ang','ekf'].forEach(k => { graphData[k].forEach(v => { if(v[ai]!==undefined&&!isNaN(v[ai])) allVals.push(v[ai]); }); });
+  if (allVals.length < 2) return;
+  let vMin = Math.min(...allVals), vMax = Math.max(...allVals);
+  const pad = (vMax-vMin)*0.1||1; vMin-=pad; vMax+=pad;
+  const px=8, py=4, gw=w-px*2, gh=h-py*2;
+
+  ctx.strokeStyle='#2a2c35'; ctx.lineWidth=0.5;
+  for(let i=0;i<=4;i++){const gy=py+(gh*i/4);ctx.beginPath();ctx.moveTo(px,gy);ctx.lineTo(px+gw,gy);ctx.stroke();}
+  const zeroY=py+gh-((0-vMin)/(vMax-vMin))*gh;
+  if(zeroY>py&&zeroY<py+gh){ctx.strokeStyle='#5c5f6e';ctx.setLineDash([3,3]);ctx.beginPath();ctx.moveTo(px,zeroY);ctx.lineTo(px+gw,zeroY);ctx.stroke();ctx.setLineDash([]);}
+
+  [{key:'accel_ang',color:'#ef5350'},{key:'gyro_ang',color:'#f0b429'},{key:'ekf',color:'#3ecf6e'}].forEach(tr=>{
+    const data=graphData[tr.key]; if(data.length<2)return;
+    ctx.strokeStyle=tr.color; ctx.lineWidth=tr.key==='ekf'?2:1; ctx.globalAlpha=tr.key==='ekf'?1:0.7;
+    ctx.beginPath(); const n=Math.min(data.length,GRAPH_MAX), start=data.length-n;
+    for(let i=0;i<n;i++){const val=data[start+i][ai];if(isNaN(val))continue;const x=px+(i/(GRAPH_MAX-1))*gw;const y=py+gh-((val-vMin)/(vMax-vMin))*gh;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);}
+    ctx.stroke(); ctx.globalAlpha=1;
+  });
+  ctx.fillStyle='#5c5f6e'; ctx.font='9px JetBrains Mono'; ctx.textAlign='left';
+  ctx.fillText(vMax.toFixed(1)+'°',px+2,py+8); ctx.fillText(vMin.toFixed(1)+'°',px+2,py+gh-2);
+}
+
+function clearPoints() {
+  pointCount = 0;
+  minX=Infinity;maxX=-Infinity;minY=Infinity;maxY=-Infinity;minZ=Infinity;maxZ=-Infinity;minR=Infinity;maxR=-Infinity;
+  centroidX=centroidY=centroidZ=0; headerSeen=false; hasAutoFramed=false;
+  // [FIX 2] Just reset draw range — geometry persists
+  if (pointGeometry) pointGeometry.setDrawRange(0, 0);
+  DOM['sPoints'].textContent='0'; DOM['pointCounter'].textContent='0 pts';
+  ['sX','sY','sZ','sRange'].forEach(id=>DOM[id].textContent='—');
+  DOM['btnExport'].disabled=true;
+  DOM['btnSave'].disabled=true;
+  pipelineStage = 0;
+  clearEdgeLines();
+  sensors={pan:null,tilt:null,range:null,lidarStatus:'waiting',gx:null,gy:null,gz:null,ax:null,ay:null,az:null,mx:null,my:null,mz:null,lat:null,lon:null,alt:null,sats:null,fix:'No fix',ekfRoll:null,ekfPitch:null,ekfYaw:null,accelAngRoll:null,accelAngPitch:null,gyroAngRoll:null,gyroAngPitch:null,gyroAngYaw:null};
+  updateSensorDisplay(); logLine('Cleared.','info');
+  graphData = { accel_ang:[], gyro_ang:[], ekf:[] };
+  lastScanPan=null; lastScanTilt=null; resumeSent=false;
+  updateResumeButton();
+}
+
+// ── Statistical Outlier Removal (SOR) — in-browser point cloud cleaning ──
+// Grid-hash accelerated K-NN. For each point, compute mean distance to K
+// nearest neighbors. Remove points where mean dist > global_mean + N*std.
+function runSOR(sorK=8, stdMult=1.0) {
+  // If live buffer is empty but a tab is active, run on that tab
+  if (pointCount === 0 && activeTabId >= 0) {
+    const s = scans.find(s => s.id === activeTabId);
+    if (s) {
+      logLine('SOR (ring-adaptive) on '+s.name+'...','info');
+      setStatus('scanning','SOR: '+s.name+'...');
+      const t0 = performance.now();
+      const result = sorOnScan(s, sorK, stdMult);
+      const ms = (performance.now()-t0).toFixed(0);
+      logLine('SOR: removed '+result.removed+' → '+s.points+' pts — '+ms+'ms','info');
+      setStatus('connected','SOR: '+s.name+' cleaned');
+      updateTabs();
+    }
+    return;
+  }
+
+  if (pointCount < sorK + 1) { logLine('SOR: not enough points','info'); return; }
+  if (headerSeen) { logLine('SOR: wait for scan to finish','info'); return; }
+
+  const t0 = performance.now();
+  logLine('SOR (ring-adaptive): K='+sorK+' stdMult='+stdMult+' on '+pointCount+' points...','info');
+
+  // Build grid hash
+  const dx = maxX - minX || 1, dy = maxY - minY || 1, dz = maxZ - minZ || 1;
+  const cellSize = Math.max(dx, dy, dz) / 20;
+  const invCell = 1.0 / cellSize;
+  const grid = new Map();
+  for (let i = 0; i < pointCount; i++) {
+    const key = Math.floor(posBuffer[i*3]*invCell)+','+Math.floor(posBuffer[i*3+1]*invCell)+','+Math.floor(posBuffer[i*3+2]*invCell);
+    if (!grid.has(key)) grid.set(key, []);
+    grid.get(key).push(i);
+  }
+
+  // Compute mean K-NN distance per point
+  const meanDists = new Float32Array(pointCount);
+  for (let i = 0; i < pointCount; i++) {
+    const px = posBuffer[i*3], py = posBuffer[i*3+1], pz = posBuffer[i*3+2];
+    const gx = Math.floor(px*invCell), gy = Math.floor(py*invCell), gz = Math.floor(pz*invCell);
+    const kDists = new Float32Array(sorK).fill(Infinity);
+    for (let ddx=-1;ddx<=1;ddx++) for (let ddy=-1;ddy<=1;ddy++) for (let ddz=-1;ddz<=1;ddz++) {
+      const cell = grid.get((gx+ddx)+','+(gy+ddy)+','+(gz+ddz));
+      if (!cell) continue;
+      for (let c=0;c<cell.length;c++) {
+        const j=cell[c]; if(j===i)continue;
+        const ex=posBuffer[j*3]-px, ey=posBuffer[j*3+1]-py, ez=posBuffer[j*3+2]-pz;
+        const dist=Math.sqrt(ex*ex+ey*ey+ez*ez);
+        if (dist<kDists[sorK-1]) {
+          kDists[sorK-1]=dist;
+          for(let q=sorK-1;q>0&&kDists[q]<kDists[q-1];q--){const tmp=kDists[q];kDists[q]=kDists[q-1];kDists[q-1]=tmp;}
+        }
+      }
+    }
+    let sum=0,cnt=0;for(let k=0;k<sorK;k++)if(kDists[k]<Infinity){sum+=kDists[k];cnt++;}
+    meanDists[i]=cnt>0?sum/cnt:Infinity;
+  }
+
+  // Group by tilt ring (round to 1°)
+  const rings = new Map();
+  for (let i = 0; i < pointCount; i++) {
+    const tilt = Math.round(panTiltBuffer[i*2+1]);
+    if (!rings.has(tilt)) rings.set(tilt, []);
+    rings.get(tilt).push(i);
+  }
+
+  // Per-ring threshold
+  const keep = new Uint8Array(pointCount);
+  for (const [tilt, indices] of rings) {
+    let rm=0,rc=0;
+    for (const i of indices) if(meanDists[i]<Infinity){rm+=meanDists[i];rc++;}
+    rm/=rc||1;
+    let rv=0;
+    for (const i of indices) if(meanDists[i]<Infinity){const d=meanDists[i]-rm;rv+=d*d;}
+    const ringThresh=rm+stdMult*Math.sqrt(rv/(rc||1));
+    for (const i of indices) if(meanDists[i]<=ringThresh) keep[i]=1;
+  }
+
+  // Compact buffers
+  let writeIdx = 0;
+  for (let i = 0; i < pointCount; i++) {
+    if (keep[i]) {
+      if (writeIdx !== i) {
+        const i3=i*3,w3=writeIdx*3,i2=i*2,w2=writeIdx*2;
+        posBuffer[w3]=posBuffer[i3];posBuffer[w3+1]=posBuffer[i3+1];posBuffer[w3+2]=posBuffer[i3+2];
+        colBuffer[w3]=colBuffer[i3];colBuffer[w3+1]=colBuffer[i3+1];colBuffer[w3+2]=colBuffer[i3+2];
+        rangeBuffer[writeIdx]=rangeBuffer[i];
+        sigmaBuffer[writeIdx]=sigmaBuffer[i];
+        panTiltBuffer[w2]=panTiltBuffer[i2];panTiltBuffer[w2+1]=panTiltBuffer[i2+1];
+      }
+      writeIdx++;
+    }
+  }
+
+  const removed = pointCount - writeIdx;
+  pointCount = writeIdx;
+
+  // Recompute bounds
+  minX=Infinity;maxX=-Infinity;minY=Infinity;maxY=-Infinity;minZ=Infinity;maxZ=-Infinity;minR=Infinity;maxR=-Infinity;
+  for (let i=0;i<pointCount;i++){
+    const x=posBuffer[i*3],y=posBuffer[i*3+1],z=posBuffer[i*3+2],r=rangeBuffer[i];
+    if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y;
+    if(z<minZ)minZ=z;if(z>maxZ)maxZ=z;if(r<minR)minR=r;if(r>maxR)maxR=r;
+  }
+
+  geometryDirty=true; syncGeometry(); applyColorGradient(); updateStats();
+  if(pointCount>0){const li=(pointCount-1)*2;lastScanPan=panTiltBuffer[li];lastScanTilt=panTiltBuffer[li+1];}
+  resumeSent=false; updateResumeButton();
+
+  const elapsed=(performance.now()-t0).toFixed(0);
+  logLine('SOR: removed '+removed+' ('+((100*removed/(removed+pointCount))||0).toFixed(1)+'%) — '+pointCount+' remaining — '+rings.size+' rings — '+elapsed+'ms','info');
+  setStatus('connected','SOR cleaned — '+pointCount+' points');
+}
+
+function setStatus(s,t) { DOM['statusBadge'].className='status-badge'+(s?' '+s:''); DOM['statusText'].textContent=t; }
+
+// ── [FIX 16] Serial — simple fire-and-forget pipeTo like working v2 ──
+async function connectSerial() {
+  if (serialPort) { await disconnectSerial(); return; }
+  const baudRate = parseInt(DOM['baudRate'].value, 10);
+  try {
+    serialPort = await navigator.serial.requestPort();
+    await serialPort.open({baudRate, dataBits:8, stopBits:1, parity:'none', flowControl:'none'});
+    DOM['btnConnect'].querySelector('span').textContent = 'Disconnect';
+    setStatus('connected','Connected — waiting for data');
+    logLine('Connected at '+baudRate+' baud.','info');
+    readLoop();
+    updateResumeButton();
+  } catch(e) { logLine('Connection failed: '+e.message,'info'); serialPort=null; }
+}
+
+async function disconnectSerial() {
+  reading = false;
+  try { if(reader){await reader.cancel();reader=null;} if(serialPort){await serialPort.close();} }
+  catch(e) { logLine('Disconnect error: '+e.message,'info'); }
+  serialPort=null; reader=null;
+  DOM['btnConnect'].querySelector('span').textContent='Connect';
+  setStatus('','Disconnected');
+  logLine('Disconnected.','info');
+  updateResumeButton();
+}
+
+async function readLoop() {
+  reading = true;
+  const dec = new TextDecoderStream();
+  serialPort.readable.pipeTo(dec.writable);
+  reader = dec.readable.getReader();
+
+  try {
+    while (reading) {
+      const {value, done} = await reader.read();
+      if (done) break;
+      lineBuffer += value;
+      const lines = lineBuffer.split('\n');
+      lineBuffer = lines.pop();
+
+      for (const raw of lines) {
+        const line = raw.trim();
+        if (!line) continue;
+
+        // ── [FIX 17] TERA TERM: log EVERY line first ──
+        let logType = 'info';
+        if (line.startsWith('EKF:') || line.startsWith('IMU:') || line.startsWith('ACCEL_ANG:') || line.startsWith('GYRO_ANG:') || line.startsWith('MAG:') || line.startsWith('GPS:') || line.startsWith('LIDAR:') || line.startsWith('PAN_TILT:')) {
+          logType = 'sensor';
+        } else if (line.includes('pan')&&line.includes('tilt')&&line.includes('range')) {
+          logType = 'header';
+        } else if (line.startsWith('=')) {
+          logType = 'header';
+        } else if (line.startsWith('[') || line.includes('========') || line.includes('BUILD') || line.includes('initialized') || line.includes('Scanner')) {
+          logType = 'boot';
+        } else if (headerSeen) {
+          const parts = line.split(',');
+          if (parts.length >= 6 && !isNaN(parseFloat(parts[0]))) logType = 'data';
+        }
+        logLine(line, logType);
+
+        // ── Now parse for sensor updates + scan points ──
+        parseSensorLine(line);
+
+        if (line.includes('pan')&&line.includes('tilt')&&line.includes('range')) {
+          headerSeen = true;
+          resumeSent = false;
+          setStatus('scanning','Scanning...');
+          updateResumeButton();
+          continue;
+        }
+
+        if (headerSeen) {
+          if (line.startsWith('=')) {
+            headerSeen = false;
+            if (pointCount > 0) {
+              // Set resume position from the last scan point
+              const li = (pointCount - 1) * 2;
+              lastScanPan = panTiltBuffer[li];
+              lastScanTilt = panTiltBuffer[li + 1];
+              geometryDirty = true;
+              syncGeometry();
+              applyColorGradient();
+              updateStats();
+              autoFrameCamera();
+              updateResumeButton();
+              setStatus('connected','Scan complete — '+pointCount+' points');
+              // Auto-save as a tab
+              saveScan();
+            } else {
+              setStatus('connected','Scan complete — 0 points (all filtered)');
+            }
+            continue;
+          }
+
+          const parts = line.split(',');
+          if (parts.length >= 6) {
+            const pan=parseFloat(parts[0]),tilt=parseFloat(parts[1]),range=parseFloat(parts[2]);
+            const x=parseFloat(parts[3]),y=parseFloat(parts[4]),z=parseFloat(parts[5]);
+            const sigma = parts.length >= 7 ? parseFloat(parts[6]) : 0;
+            if (!isNaN(x)&&!isNaN(y)&&!isNaN(z)&&range>0) {
+              sensors.pan=pan; sensors.tilt=tilt; sensors.range=range; sensors.lidarStatus='Valid';
+              updateSensorDisplay();
+              addPoint(x, y, z, range, pan, tilt, sigma);
+              scheduleRebuild();
+            }
+          }
+        }
+      }
+    }
+  } catch(e) {
+    if (reading) logLine('Read error: '+e.message,'info');
+  }
+}
+
+// ── Log (already well-optimized in original) ──
+let _logQueue=[], _logFlushPending=false;
+function logLine(t,ty) {
+  _logQueue.push({t,ty});
+  if(_logQueue.length>300) _logQueue.shift();
+  if(!_logFlushPending){_logFlushPending=true;
+    requestAnimationFrame(()=>{_logFlushPending=false;
+      const l=DOM['log-content']; const frag=document.createDocumentFragment();
+      for(const item of _logQueue){const d=document.createElement('div');d.className=item.ty+'-line';d.textContent=item.t;frag.appendChild(d);}
+      l.appendChild(frag);_logQueue=[];
+      while(l.children.length>500)l.removeChild(l.firstChild);l.scrollTop=l.scrollHeight;
+    });
+  }
+}
+function toggleLog() { DOM['serial-log'].classList.toggle('hidden'); }
+
+// ── [FIX 13] Export includes range column ──
+function exportCSV() {
+  // Check if sigma data exists
+  let hasSig = false;
+  for (let i = 0; i < pointCount; i++) { if (sigmaBuffer[i] > 0) { hasSig = true; break; } }
+  const parts=[hasSig ? 'pan,tilt,range_mm,x,y,z,sigma\n' : 'pan,tilt,range_mm,x,y,z\n'];
+  for(let i=0;i<pointCount;i++) {
+    const i2=i*2;
+    let line = panTiltBuffer[i2].toFixed(1)+','+panTiltBuffer[i2+1].toFixed(1)+','+rangeBuffer[i].toFixed(1)+','+posBuffer[i*3].toFixed(4)+','+posBuffer[i*3+1].toFixed(4)+','+posBuffer[i*3+2].toFixed(4);
+    if (hasSig) line += ','+sigmaBuffer[i].toFixed(0);
+    parts.push(line+'\n');
+  }
+  const b=new Blob(parts,{type:'text/csv'}),u=URL.createObjectURL(b),a=document.createElement('a');
+  a.href=u;a.download='tfd_scan_'+new Date().toISOString().slice(0,19).replace(/[:-]/g,'')+'.csv';a.click();URL.revokeObjectURL(u);
+  logLine('Exported '+pointCount+' points.','info');
+}
+
+// ── CSV loader — auto-creates a scan tab on import ──
+function loadCSVText(text, fileName) {
+  clearPoints();
+  const lines = text.trim().split('\n');
+  let loaded = 0;
+  for (const raw of lines) {
+    const l = raw.trim();
+    if (!l || l.startsWith('x,y,z') || l.startsWith('pan,tilt')) continue;
+    if (l.startsWith('=') || l.startsWith('[') || l.startsWith('EKF:') || l.startsWith('IMU:') || l.startsWith('MAG:') || l.startsWith('GPS:') || l.startsWith('LIDAR:') || l.startsWith('ACCEL_ANG:') || l.startsWith('GYRO_ANG:')) continue;
+    const p = l.split(',');
+    if (p.length >= 6) {
+      const pan=parseFloat(p[0]),tilt=parseFloat(p[1]),rng=parseFloat(p[2]),x=parseFloat(p[3]),y=parseFloat(p[4]),z=parseFloat(p[5]);
+      const sigma = p.length >= 7 ? parseFloat(p[6]) : 0;
+      if(!isNaN(x)&&!isNaN(y)&&!isNaN(z)&&rng>10) { addPoint(x,y,z,rng,pan,tilt,sigma); loaded++; }
+    } else if (p.length >= 4) {
+      const x=parseFloat(p[0]),y=parseFloat(p[1]),z=parseFloat(p[2]),rng=parseFloat(p[3]);
+      if(!isNaN(x)&&!isNaN(y)&&!isNaN(z)&&rng>10) {
+        const tilt = Math.asin(Math.min(1,Math.max(-1,-z/rng))) * 180/Math.PI;
+        const pan = Math.atan2(-x,y) * 180/Math.PI;
+        addPoint(x,y,z,rng,pan,tilt); loaded++;
+      }
+    }
+  }
+  geometryDirty=true; syncGeometry(); applyColorGradient(); updateStats(); autoFrameCamera();
+  if (pointCount > 0) {
+    const li = (pointCount - 1) * 2;
+    lastScanPan = panTiltBuffer[li];
+    lastScanTilt = panTiltBuffer[li + 1];
+  }
+  resumeSent = false;
+  updateResumeButton();
+  logLine('Imported '+loaded+' points','info');
+  // Auto-save as a new scan tab
+  if (pointCount > 0) saveScan(fileName);
+}
+
+function importCSV(input) {
+  const f = input.files[0]; if(!f) return;
+  const fname = f.name.replace(/\.(csv|txt)$/i, '');
+  const r = new FileReader();
+  r.onload = ev => loadCSVText(ev.target.result, fname);
+  r.readAsText(f);
+  input.value = '';
+}
+
+// ── Serial write ──
+async function sendSerial(text) {
+  if (!serialPort || !serialPort.writable) {
+    logLine('Cannot send — not connected.','info');
+    return false;
+  }
+  const encoder = new TextEncoder();
+  const writer = serialPort.writable.getWriter();
+  try {
+    await writer.write(encoder.encode(text));
+    logLine('Sent: ' + text.trim(),'info');
+    return true;
+  } catch(e) {
+    logLine('Send error: '+e.message,'info');
+    return false;
+  } finally {
+    writer.releaseLock();
+  }
+}
+
+// ── Resume scan — sends last pan/tilt to MCU ONCE, only when not scanning ──
+let resumeSent = false;
+
+async function resumeScan() {
+  if (lastScanPan === null || lastScanTilt === null) {
+    logLine('No scan position to resume from — import a scan first.','info');
+    return;
+  }
+  if (!serialPort || !serialPort.writable) {
+    logLine('Connect to serial port first.','info');
+    return;
+  }
+  if (headerSeen) {
+    logLine('Scan in progress — cannot resume while scanning.','info');
+    return;
+  }
+  if (resumeSent) {
+    logLine('Resume already sent (pan='+lastScanPan.toFixed(1)+'° tilt='+lastScanTilt.toFixed(1)+'°). Press scan on MCU.','info');
+    return;
+  }
+  const cmd = 'RESUME:' + lastScanPan.toFixed(1) + ',' + lastScanTilt.toFixed(1) + '\n';
+  if (await sendSerial(cmd)) {
+    resumeSent = true;
+    logLine('Resume sent — pan=' + lastScanPan.toFixed(1) + '° tilt=' + lastScanTilt.toFixed(1) + '° — press scan on MCU','info');
+    updateResumeButton();
+  }
+}
+
+// ── Update resume button state ──
+function updateResumeButton() {
+  if (DOM['btnResume']) {
+    const canResume = lastScanPan !== null && serialPort && serialPort.writable && !headerSeen && !resumeSent;
+    DOM['btnResume'].disabled = !canResume;
+    if (resumeSent) {
+      DOM['btnResume'].title = 'Resume sent (pan='+lastScanPan.toFixed(1)+'° tilt='+lastScanTilt.toFixed(1)+'°) — press scan on MCU';
+    } else if (headerSeen) {
+      DOM['btnResume'].title = 'Scan in progress';
+    } else if (lastScanPan !== null) {
+      DOM['btnResume'].title = 'Resume from pan='+lastScanPan.toFixed(1)+'° tilt='+lastScanTilt.toFixed(1)+'°';
+    } else {
+      DOM['btnResume'].title = 'Import a scan first, then connect';
+    }
+  }
+}
+
+// ── Drag-and-drop ──
+let dc=0;
+document.body.addEventListener('dragenter',e=>{e.preventDefault();dc++;DOM['dropOverlay'].classList.add('active');});
+document.body.addEventListener('dragleave',()=>{dc--;if(!dc)DOM['dropOverlay'].classList.remove('active');});
+document.body.addEventListener('dragover',e=>e.preventDefault());
+document.body.addEventListener('drop',e=>{
+  e.preventDefault();dc=0;DOM['dropOverlay'].classList.remove('active');
+  const f=e.dataTransfer.files[0]; if(!f)return;
+  const fname=f.name.replace(/\.(csv|txt)$/i,'');
+  const r=new FileReader();
+  r.onload=ev=>loadCSVText(ev.target.result,fname);
+  r.readAsText(f);
+});
+
+// ============================================================================
+// MULTI-SCAN MANAGEMENT + BACKEND + ICP + SLAM + XLSX
+// ============================================================================
+
+// ── Scan Storage — Tab-based ──
+const SCAN_COLORS = [
+  [0.30,0.55,0.95],[0.24,0.81,0.43],[0.94,0.33,0.31],[0.94,0.71,0.16],
+  [0.66,0.55,0.98],[0.06,0.80,0.80],[1.0,0.50,0.0],[0.80,0.20,0.80]
+];
+let scans = [];
+let scanIdCounter = 0;
+let activeTabId = -1;
+
+function saveScan(customName) {
+  if (pointCount === 0) { logLine('No points to save','info'); return; }
+  if (headerSeen) { logLine('Wait for scan to finish','info'); return; }
+
+  const id = scanIdCounter++;
+  const n = pointCount;
+  const color = SCAN_COLORS[id % SCAN_COLORS.length];
+  const name = customName || 'Scan '+(id+1);
+
+  const pos = new Float32Array(n * 3); pos.set(posBuffer.subarray(0, n * 3));
+  const rng = new Float32Array(n); rng.set(rangeBuffer.subarray(0, n));
+  const sig = new Float32Array(n); sig.set(sigmaBuffer.subarray(0, n));
+  const pt  = new Float32Array(n * 2); pt.set(panTiltBuffer.subarray(0, n * 2));
+  const col = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { col[i*3]=color[0]; col[i*3+1]=color[1]; col[i*3+2]=color[2]; }
+
+  // Check if sigma data is available
+  let hasSigma = false;
+  for (let i = 0; i < n; i++) { if (sig[i] > 0) { hasSigma = true; break; } }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  geo.setDrawRange(0, n); geo.computeBoundingSphere();
+  const mat = new THREE.PointsMaterial({size:3, sizeAttenuation:false, vertexColors:true});
+  const obj = new THREE.Points(geo, mat);
+  scene.add(obj);
+
+  scans.push({id, name, points:n, pos, rng, sig, pt, col, color, obj, visible:true, hasSigma, history:[]});
+  clearPoints();
+  switchTab(id);
+  updateTabs();
+  logLine('Saved '+name+': '+n.toLocaleString()+' pts','info');
+  setStatus('connected','Saved '+name);
+}
+
+function deleteScan(id) {
+  const idx = scans.findIndex(s => s.id === id);
+  if (idx < 0) return;
+  scene.remove(scans[idx].obj);
+  scans[idx].obj.geometry.dispose(); scans[idx].obj.material.dispose();
+  logLine('Deleted '+scans[idx].name,'info');
+  scans.splice(idx, 1);
+  if (activeTabId === id) activeTabId = scans.length > 0 ? scans[0].id : -1;
+  updateTabs();
+}
+
+function switchTab(id) {
+  activeTabId = id;
+  // Show all scans but highlight active
+  for (const s of scans) {
+    s.obj.material.opacity = (s.id === id) ? 1.0 : 0.35;
+    s.obj.material.transparent = (s.id !== id);
+    s.obj.visible = s.visible;
+  }
+  updateTabs();
+  updateFilterTarget();
+}
+
+function toggleScanVisibility(id) {
+  const s = scans.find(s => s.id === id);
+  if (!s) return;
+  s.visible = !s.visible;
+  s.obj.visible = s.visible;
+  updateTabs();
+}
+
+function updateTabs() {
+  const el = DOM['tabContainer'];
+  if (!el) return;
+  let html = '';
+  for (const s of scans) {
+    const rgb = `rgb(${Math.round(s.color[0]*255)},${Math.round(s.color[1]*255)},${Math.round(s.color[2]*255)})`;
+    const active = s.id === activeTabId ? ' active' : '';
+    const vis = s.visible ? 1 : 0.4;
+    html += `<div class="scan-tab${active}" style="opacity:${vis}" onclick="switchTab(${s.id})">`;
+    html += `<div class="tab-dot" style="background:${rgb}"></div>`;
+    html += `${s.name} <span class="tab-pts">${s.points.toLocaleString()}</span>`;
+    html += `<span class="tab-close" onclick="event.stopPropagation();deleteScan(${s.id})" title="Remove scan">✕</span>`;
+    html += `</div>`;
+  }
+  el.innerHTML = html;
+
+  // Button states
+  if (DOM['btnICP']) DOM['btnICP'].disabled = scans.length < 2;
+  if (DOM['btnSLAM']) DOM['btnSLAM'].disabled = scans.length < 2;
+  if (DOM['btnXLSX']) DOM['btnXLSX'].disabled = scans.length === 0 && pointCount === 0;
+}
+
+
+// ── Filter Panel ──
+function toggleFilterPanel() {
+  const panel = DOM['filter-panel'];
+  if (!panel) return;
+  panel.classList.toggle('open');
+  if (panel.classList.contains('open')) updateFilterTarget();
+}
+
+function updateFilterTarget() {
+  const el = document.getElementById('fpTarget');
+  if (!el) return;
+  const s = scans.find(s => s.id === activeTabId);
+  el.textContent = s ? s.name+' ('+s.points.toLocaleString()+')' : 'No scan selected';
+  // Update revert button
+  const btn = document.getElementById('fpRevertBtn');
+  if (btn) btn.disabled = !(s && s.history && s.history.length > 0);
+}
+
+function getActiveScan() {
+  const s = scans.find(s => s.id === activeTabId);
+  if (!s) { logLine('Click a scan tab first','info'); return null; }
+  return s;
+}
+
+// Snapshot before each filter — saves current state for revert
+function pushSnapshot(s) {
+  const n = s.points;
+  s.history.push({
+    points: n,
+    pos: new Float32Array(s.pos.subarray(0, n*3)),
+    col: new Float32Array(s.col.subarray(0, n*3)),
+    rng: new Float32Array(s.rng.subarray(0, n)),
+    sig: new Float32Array(s.sig.subarray(0, n)),
+    pt:  new Float32Array(s.pt.subarray(0, n*2))
+  });
+  if (s.history.length > 10) s.history.shift();
+  const btn = document.getElementById('fpRevertBtn');
+  if (btn) btn.disabled = false;
+}
+
+// Revert to previous state
+function fpRevert() {
+  const s = getActiveScan(); if (!s) return;
+  if (!s.history || s.history.length === 0) { logLine('Nothing to revert','info'); return; }
+
+  const snap = s.history.pop();
+  s.points = snap.points;
+  s.pos.set(snap.pos);
+  s.col.set(snap.col);
+  s.rng.set(snap.rng);
+  s.sig.set(snap.sig);
+  s.pt.set(snap.pt);
+
+  s.obj.geometry.setDrawRange(0, snap.points);
+  const pa = s.obj.geometry.getAttribute('position');
+  pa.array.set(snap.pos); pa.needsUpdate = true;
+  const ca = s.obj.geometry.getAttribute('color');
+  ca.array.set(snap.col); ca.needsUpdate = true;
+  s.obj.geometry.computeBoundingSphere();
+
+  logLine('Reverted '+s.name+' → '+snap.points+' pts ('+s.history.length+' steps left)','info');
+  setStatus('connected','Reverted '+s.name);
+  updateTabs(); updateFilterTarget();
+}
+
+// SOR with tunable params
+async function fpRunSOR() {
+  const s = getActiveScan(); if (!s) return;
+  pushSnapshot(s);
+  const k = parseInt(document.getElementById('fpSorK').value);
+  const std = parseInt(document.getElementById('fpSorStd').value) / 10;
+  logLine('SOR (ring-adaptive): K='+k+' std='+std+' on '+s.name+'...','info');
+  setStatus('scanning','SOR: '+s.name+'...');
+  const t0 = performance.now();
+  const result = sorOnScan(s, k, std);
+  const ms = (performance.now()-t0).toFixed(0);
+  const stat = 'Removed '+result.removed+' → '+s.points+' pts ('+ms+'ms)';
+  document.getElementById('fpSorStat').textContent = stat;
+  logLine('SOR: '+stat,'info');
+  setStatus('connected','SOR: '+s.name+' cleaned');
+  updateTabs(); updateFilterTarget();
+}
+
+// Sigma Filter — uses real sensor sigma when available
+function fpRunSigmaFilter() {
+  const s = getActiveScan(); if (!s) return;
+  if (!s.hasSigma) {
+    logLine('No sigma data — update firmware to send sigma as 7th CSV field','info');
+    logLine('Format: pan,tilt,range,x,y,z,sigma','info');
+    setStatus('connected','No sigma data available');
+    document.getElementById('fpSigmaStat').textContent = 'No sigma in this scan';
+    return;
+  }
+  pushSnapshot(s);
+  const maxSigma = parseInt(document.getElementById('fpSigmaMax').value);
+  const n = s.points;
+
+  const t0 = performance.now();
+  logLine('Sigma filter: max='+maxSigma+'mm on '+s.name+'...','info');
+  setStatus('scanning','Sigma filter...');
+
+  let w = 0;
+  for (let i = 0; i < n; i++) {
+    if (s.sig[i] <= maxSigma) {
+      if (w !== i) {
+        const i3=i*3,w3=w*3,i2=i*2,w2=w*2;
+        s.pos[w3]=s.pos[i3];s.pos[w3+1]=s.pos[i3+1];s.pos[w3+2]=s.pos[i3+2];
+        s.col[w3]=s.col[i3];s.col[w3+1]=s.col[i3+1];s.col[w3+2]=s.col[i3+2];
+        s.rng[w]=s.rng[i];s.sig[w]=s.sig[i];s.pt[w2]=s.pt[i2];s.pt[w2+1]=s.pt[i2+1];
+      }
+      w++;
+    }
+  }
+
+  const removed = n - w;
+  s.points = w;
+  s.obj.geometry.setDrawRange(0, w);
+  const pa = s.obj.geometry.getAttribute('position');
+  pa.array.set(s.pos.subarray(0, w*3)); pa.needsUpdate = true;
+  const ca = s.obj.geometry.getAttribute('color');
+  ca.array.set(s.col.subarray(0, w*3)); ca.needsUpdate = true;
+  s.obj.geometry.computeBoundingSphere();
+
+  const ms = (performance.now()-t0).toFixed(0);
+  const stat = 'Removed '+removed+' (sigma>'+maxSigma+'mm) → '+w+' pts ('+ms+'ms)';
+  document.getElementById('fpSigmaStat').textContent = stat;
+  logLine('Sigma: '+stat,'info');
+  setStatus('connected','Sigma filter: '+w+' pts');
+  updateTabs(); updateFilterTarget();
+}
+
+// Range Consistency — detects pixel mixing from range data alone (no sigma needed)
+// For each point, checks if its range sits between two distinct range clusters
+// in its local pan/tilt neighborhood. If so, it's likely a mixed return.
+function fpRunRangeConsistency() {
+  const s = getActiveScan(); if (!s) return;
+  pushSnapshot(s);
+  const spreadThresh = parseInt(document.getElementById('fpRCSpread').value);
+  const gapRatio = parseInt(document.getElementById('fpRCGap').value) / 10;
+  const n = s.points;
+
+  const t0 = performance.now();
+  logLine('Range consistency: spread='+spreadThresh+'mm gap='+gapRatio+' on '+s.name+'...','info');
+  setStatus('scanning','Range consistency...');
+
+  // Group by tilt ring
+  const rings = new Map();
+  for (let i = 0; i < n; i++) {
+    const tilt = Math.round(s.pt[i*2+1]);
+    if (!rings.has(tilt)) rings.set(tilt, []);
+    rings.get(tilt).push(i);
+  }
+
+  // Sort each ring by pan
+  for (const [tilt, indices] of rings) {
+    indices.sort((a, b) => s.pt[a*2] - s.pt[b*2]);
+  }
+
+  const keep = new Uint8Array(n).fill(1);
+  const halfW = 5; // check 5 neighbors on each side along the ring
+
+  for (const [tilt, ring] of rings) {
+    const len = ring.length;
+    for (let j = 0; j < len; j++) {
+      const idx = ring[j];
+      const myRange = s.rng[idx];
+
+      // Collect neighbor ranges
+      const nRanges = [];
+      for (let d = -halfW; d <= halfW; d++) {
+        if (d === 0) continue;
+        let ni = j + d;
+        if (ni < 0) ni += len;
+        if (ni >= len) ni -= len;
+        nRanges.push(s.rng[ring[ni]]);
+      }
+
+      if (nRanges.length < 4) continue;
+
+      // Sort neighbor ranges
+      nRanges.sort((a, b) => a - b);
+
+      const rMin = nRanges[0];
+      const rMax = nRanges[nRanges.length - 1];
+      const spread = rMax - rMin;
+
+      // If spread is large, there are two distinct surfaces nearby
+      if (spread > spreadThresh) {
+        // Check if this point's range sits in the gap between the two clusters
+        // Find the biggest gap in the sorted ranges
+        let maxGap = 0, gapLow = 0, gapHigh = 0;
+        for (let k = 0; k < nRanges.length - 1; k++) {
+          const gap = nRanges[k+1] - nRanges[k];
+          if (gap > maxGap) {
+            maxGap = gap;
+            gapLow = nRanges[k];
+            gapHigh = nRanges[k+1];
+          }
+        }
+
+        // If there's a significant gap and this point is IN the gap, it's mixed
+        if (maxGap > spread * gapRatio) {
+          if (myRange > gapLow && myRange < gapHigh) {
+            keep[idx] = 0; // pixel mixing — kill it
+          }
+        }
+      }
+    }
+  }
+
+  // Compact
+  let w = 0;
+  for (let i = 0; i < n; i++) {
+    if (keep[i]) {
+      if (w !== i) {
+        const i3=i*3,w3=w*3,i2=i*2,w2=w*2;
+        s.pos[w3]=s.pos[i3];s.pos[w3+1]=s.pos[i3+1];s.pos[w3+2]=s.pos[i3+2];
+        s.col[w3]=s.col[i3];s.col[w3+1]=s.col[i3+1];s.col[w3+2]=s.col[i3+2];
+        s.rng[w]=s.rng[i];s.sig[w]=s.sig[i];s.pt[w2]=s.pt[i2];s.pt[w2+1]=s.pt[i2+1];
+      }
+      w++;
+    }
+  }
+
+  const removed = n - w;
+  s.points = w;
+  s.obj.geometry.setDrawRange(0, w);
+  const pa = s.obj.geometry.getAttribute('position');
+  pa.array.set(s.pos.subarray(0, w*3)); pa.needsUpdate = true;
+  const ca = s.obj.geometry.getAttribute('color');
+  ca.array.set(s.col.subarray(0, w*3)); ca.needsUpdate = true;
+  s.obj.geometry.computeBoundingSphere();
+
+  const ms = (performance.now()-t0).toFixed(0);
+  const stat = 'Removed '+removed+' mixed pts → '+w+' pts ('+ms+'ms)';
+  document.getElementById('fpRCStat').textContent = stat;
+  logLine('Range consistency: '+stat,'info');
+  setStatus('connected','Range consistency: '+w+' pts');
+  updateTabs(); updateFilterTarget();
+}
+
+// Ring-Aware Smooth — smooths Z within scan rings, blends across adjacent rings
+function fpRunRingSmooth() {
+  const s = getActiveScan(); if (!s) return;
+  pushSnapshot(s);
+  const halfW = parseInt(document.getElementById('fpRingW').value);
+  const crossBlend = parseInt(document.getElementById('fpRingCross').value) / 10;
+  const n = s.points;
+  if (n < 10) return;
+
+  const t0 = performance.now();
+  logLine('Ring smooth: window='+halfW+' cross='+crossBlend+' on '+s.name+'...','info');
+  setStatus('scanning','Ring smooth...');
+
+  // Group points by tilt ring (round to 1°)
+  const rings = new Map();
+  for (let i = 0; i < n; i++) {
+    const tilt = Math.round(s.pt[i*2+1]);
+    if (!rings.has(tilt)) rings.set(tilt, []);
+    rings.get(tilt).push(i);
+  }
+
+  // Sort each ring by pan angle
+  for (const [tilt, indices] of rings) {
+    indices.sort((a, b) => s.pt[a*2] - s.pt[b*2]);
+  }
+
+  // Build tilt→ring lookup sorted by tilt
+  const tiltKeys = Array.from(rings.keys()).sort((a,b) => a - b);
+
+  // Smoothed positions
+  const smoothX = new Float32Array(n);
+  const smoothY = new Float32Array(n);
+  const smoothZ = new Float32Array(n);
+
+  for (let ri = 0; ri < tiltKeys.length; ri++) {
+    const tilt = tiltKeys[ri];
+    const ring = rings.get(tilt);
+    const len = ring.length;
+
+    for (let j = 0; j < len; j++) {
+      const idx = ring[j];
+      let sumX = 0, sumY = 0, sumZ = 0, sumW = 0;
+
+      // Same-ring neighbors (along pan direction)
+      for (let d = -halfW; d <= halfW; d++) {
+        let ni = j + d;
+        // Wrap around the ring (it's a full 360° sweep)
+        if (ni < 0) ni += len;
+        if (ni >= len) ni -= len;
+        const nIdx = ring[ni];
+        const w = 1.0 / (1.0 + Math.abs(d));
+        sumX += s.pos[nIdx*3]   * w;
+        sumY += s.pos[nIdx*3+1] * w;
+        sumZ += s.pos[nIdx*3+2] * w;
+        sumW += w;
+      }
+
+      // Cross-ring neighbors (adjacent tilts, same approximate pan position)
+      if (crossBlend > 0) {
+        const myPan = s.pt[idx*2];
+        for (let dr = -1; dr <= 1; dr += 2) {
+          const adjRi = ri + dr;
+          if (adjRi < 0 || adjRi >= tiltKeys.length) continue;
+          const adjRing = rings.get(tiltKeys[adjRi]);
+          // Binary search for closest pan angle in adjacent ring
+          let lo = 0, hi = adjRing.length - 1, best = 0;
+          while (lo <= hi) {
+            const mid = (lo + hi) >> 1;
+            const midPan = s.pt[adjRing[mid]*2];
+            if (Math.abs(s.pt[adjRing[best]*2] - myPan) > Math.abs(midPan - myPan)) best = mid;
+            if (midPan < myPan) lo = mid + 1; else hi = mid - 1;
+          }
+          // Take a few neighbors around best in adjacent ring
+          for (let dd = -2; dd <= 2; dd++) {
+            let ai = best + dd;
+            if (ai < 0 || ai >= adjRing.length) continue;
+            const aIdx = adjRing[ai];
+            const w = crossBlend / (1.0 + Math.abs(dd));
+            sumX += s.pos[aIdx*3]   * w;
+            sumY += s.pos[aIdx*3+1] * w;
+            sumZ += s.pos[aIdx*3+2] * w;
+            sumW += w;
+          }
+        }
+      }
+
+      smoothX[idx] = sumX / sumW;
+      smoothY[idx] = sumY / sumW;
+      smoothZ[idx] = sumZ / sumW;
+    }
+  }
+
+  // Apply smoothed positions
+  for (let i = 0; i < n; i++) {
+    s.pos[i*3]   = smoothX[i];
+    s.pos[i*3+1] = smoothY[i];
+    s.pos[i*3+2] = smoothZ[i];
+  }
+
+  const pa = s.obj.geometry.getAttribute('position');
+  pa.array.set(s.pos.subarray(0, n*3)); pa.needsUpdate = true;
+  s.obj.geometry.computeBoundingSphere();
+
+  const ms = (performance.now()-t0).toFixed(0);
+  const stat = tiltKeys.length+' rings smoothed ('+ms+'ms)';
+  document.getElementById('fpRingStat').textContent = stat;
+  logLine('Ring smooth: '+stat,'info');
+  setStatus('connected','Ring smooth done');
+}
+
+// Voxel Downsample — collapse nearby points into uniform grid
+function fpRunVoxel() {
+  const s = getActiveScan(); if (!s) return;
+  pushSnapshot(s);
+  const voxSize = parseInt(document.getElementById('fpVoxel').value);
+  const n = s.points;
+  if (n < 10) return;
+
+  const t0 = performance.now();
+  logLine('Voxel downsample: size='+voxSize+'mm on '+s.name+' ('+n+' pts)...','info');
+  setStatus('scanning','Voxel downsample...');
+
+  // Hash points into voxels
+  const invV = 1.0 / voxSize;
+  const voxels = new Map();
+
+  for (let i = 0; i < n; i++) {
+    const vx = Math.floor(s.pos[i*3]   * invV);
+    const vy = Math.floor(s.pos[i*3+1] * invV);
+    const vz = Math.floor(s.pos[i*3+2] * invV);
+    const key = vx + ',' + vy + ',' + vz;
+    if (!voxels.has(key)) voxels.set(key, []);
+    voxels.get(key).push(i);
+  }
+
+  // Average all point attributes within each voxel
+  let w = 0;
+  for (const [key, indices] of voxels) {
+    const cnt = indices.length;
+    let ax=0,ay=0,az=0,ar=0,asig=0,apan=0,atilt=0,acr=0,acg=0,acb=0;
+    for (const i of indices) {
+      ax+=s.pos[i*3]; ay+=s.pos[i*3+1]; az+=s.pos[i*3+2];
+      ar+=s.rng[i]; asig+=s.sig[i]; apan+=s.pt[i*2]; atilt+=s.pt[i*2+1];
+      acr+=s.col[i*3]; acg+=s.col[i*3+1]; acb+=s.col[i*3+2];
+    }
+    const w3=w*3, w2=w*2;
+    s.pos[w3]=ax/cnt; s.pos[w3+1]=ay/cnt; s.pos[w3+2]=az/cnt;
+    s.rng[w]=ar/cnt; s.sig[w]=asig/cnt;
+    s.pt[w2]=apan/cnt; s.pt[w2+1]=atilt/cnt;
+    s.col[w3]=acr/cnt; s.col[w3+1]=acg/cnt; s.col[w3+2]=acb/cnt;
+    w++;
+  }
+
+  const removed = n - w;
+  s.points = w;
+  s.obj.geometry.setDrawRange(0, w);
+  const pa = s.obj.geometry.getAttribute('position');
+  pa.array.set(s.pos.subarray(0, w*3)); pa.needsUpdate = true;
+  const ca = s.obj.geometry.getAttribute('color');
+  ca.array.set(s.col.subarray(0, w*3)); ca.needsUpdate = true;
+  s.obj.geometry.computeBoundingSphere();
+
+  const ms = (performance.now()-t0).toFixed(0);
+  const stat = n+' → '+w+' pts, '+voxels.size+' voxels ('+ms+'ms)';
+  document.getElementById('fpVoxelStat').textContent = stat;
+  logLine('Voxel: '+stat,'info');
+  setStatus('connected','Voxel: '+w+' pts');
+  updateTabs(); updateFilterTarget();
+}
+
+// Normals with tunable K
+async function fpRunNormals() {
+  const s = getActiveScan(); if (!s) return;
+  if (!wsConnected) { logLine('Start backend first','info'); return; }
+  pushSnapshot(s);
+  const k = parseInt(document.getElementById('fpNormK').value);
+  setStatus('scanning','Normals K='+k+'...');
+  logLine('Normals: K='+k+' on '+s.name+'...','info');
+  const scan = packScan(s.pos, s.rng, s.pt, s.points);
+  const result = await sendBackend({cmd:'normals', scan, k});
+  const curv = result.curvatures;
+  let cMax=0; for(let i=0;i<curv.length;i++) if(curv[i]>cMax) cMax=curv[i];
+  if(cMax<1e-8)cMax=1;
+  for(let i=0;i<s.points&&i<curv.length;i++){
+    const t=Math.min(curv[i]/(cMax*0.3),1),i3=i*3;
+    if(t<0.33){const u=t/0.33;s.col[i3]=0.1;s.col[i3+1]=0.3+u*0.5;s.col[i3+2]=0.9-u*0.4;}
+    else if(t<0.66){const u=(t-0.33)/0.33;s.col[i3]=u*0.9;s.col[i3+1]=0.8;s.col[i3+2]=0.1;}
+    else{const u=(t-0.66)/0.34;s.col[i3]=0.95;s.col[i3+1]=0.8-u*0.6;s.col[i3+2]=0.1;}
+  }
+  const ca=s.obj.geometry.getAttribute('color');ca.array.set(s.col.subarray(0,s.points*3));ca.needsUpdate=true;
+  const stat = 'K='+k+', curvature 0–'+cMax.toFixed(6)+' ('+result.ms+'ms)';
+  document.getElementById('fpNormStat').textContent = stat;
+  logLine('Normals: '+stat,'info');
+  setStatus('connected','Normals done — blue=flat red=edge');
+}
+
+// RANSAC with tunable params
+async function fpRunRANSAC() {
+  const s = getActiveScan(); if (!s) return;
+  if (!wsConnected) { logLine('Start backend first','info'); return; }
+  pushSnapshot(s);
+  const minPts = parseInt(document.getElementById('fpRansacMin').value);
+  const maxP = parseInt(document.getElementById('fpRansacMax').value);
+  setStatus('scanning','RANSAC...');
+  logLine('RANSAC: min='+minPts+' max='+maxP+' on '+s.name+'...','info');
+  const result = await sendBackend({cmd:'ransac', min_points:minPts, max_planes:maxP});
+  const PLANE_COLORS=[[0.9,0.2,0.2],[0.2,0.7,0.2],[0.2,0.3,0.9],[0.9,0.7,0.1],[0.8,0.2,0.8],[0.1,0.8,0.8],[1,0.5,0],[0.5,0,1]];
+  const assign=result.assignments;
+  for(let i=0;i<s.points&&i<assign.length;i++){
+    const i3=i*3,p=assign[i];
+    if(p>=0){const c=PLANE_COLORS[p%PLANE_COLORS.length];s.col[i3]=c[0];s.col[i3+1]=c[1];s.col[i3+2]=c[2];}
+    else{s.col[i3]=0.4;s.col[i3+1]=0.4;s.col[i3+2]=0.4;}
+  }
+  const ca=s.obj.geometry.getAttribute('color');ca.array.set(s.col.subarray(0,s.points*3));ca.needsUpdate=true;
+  const stat = result.num_planes+' planes found ('+result.ms+'ms)';
+  document.getElementById('fpRansacStat').textContent = stat;
+  logLine('RANSAC: '+stat,'info');
+  setStatus('connected','RANSAC: '+result.num_planes+' planes');
+}
+
+// Edges with tunable angle
+async function fpRunEdges() {
+  const s = getActiveScan(); if (!s) return;
+  if (!wsConnected) { logLine('Start backend first','info'); return; }
+  const angle = parseInt(document.getElementById('fpEdgeAngle').value);
+  setStatus('scanning','Edges...');
+  logLine('Edges: angle='+angle+'° on '+s.name+'...','info');
+  const result = await sendBackend({cmd:'edges', angle_thresh:angle});
+  clearEdgeLines();
+  for(const line of result.lines){
+    const geo=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(...line.start),new THREE.Vector3(...line.end)]);
+    const obj=new THREE.Line(geo,new THREE.LineBasicMaterial({color:0xffffff,linewidth:2}));
+    scene.add(obj);edgeLineObjects.push(obj);
+  }
+  const stat = result.lines.length+' edges at '+angle+'° ('+result.ms+'ms)';
+  document.getElementById('fpEdgeStat').textContent = stat;
+  logLine('Edges: '+stat,'info');
+  setStatus('connected','Edges: '+result.lines.length+' lines');
+}
+
+// Reproject
+async function fpRunReproject() {
+  const s = getActiveScan(); if (!s) return;
+  if (!wsConnected) { logLine('Start backend first','info'); return; }
+  pushSnapshot(s);
+  setStatus('scanning','Reproject...');
+  logLine('Reproject on '+s.name+'...','info');
+  const result = await sendBackend({cmd:'reproject'});
+  const updated=result.scan,snapped=result.snapped_mask;
+  for(let i=0;i<s.points&&i<updated.length;i++){s.pos[i*3]=updated[i][3];s.pos[i*3+1]=updated[i][4];s.pos[i*3+2]=updated[i][5];}
+  if(snapped)for(let i=0;i<s.points&&i<snapped.length;i++)if(snapped[i]){s.col[i*3]=1;s.col[i*3+1]=1;s.col[i*3+2]=1;}
+  const pa=s.obj.geometry.getAttribute('position');pa.array.set(s.pos.subarray(0,s.points*3));pa.needsUpdate=true;
+  const ca=s.obj.geometry.getAttribute('color');ca.array.set(s.col.subarray(0,s.points*3));ca.needsUpdate=true;
+  s.obj.geometry.computeBoundingSphere();
+  const stat = result.reprojected+' pts snapped ('+result.ms+'ms)';
+  document.getElementById('fpReprojStat').textContent = stat;
+  logLine('Reproject: '+stat,'info');
+  setStatus('connected','Reproject: '+result.reprojected+' pts sharpened');
+}
+
+// Reset colors
+function fpResetColors() {
+  const s = getActiveScan(); if (!s) return;
+  pushSnapshot(s);
+  for(let i=0;i<s.points;i++){s.col[i*3]=s.color[0];s.col[i*3+1]=s.color[1];s.col[i*3+2]=s.color[2];}
+  const ca=s.obj.geometry.getAttribute('color');ca.array.set(s.col.subarray(0,s.points*3));ca.needsUpdate=true;
+  logLine('Reset colors on '+s.name,'info');
+}
+
+// SOR on a specific saved scan (in-browser)
+// Tilt-adaptive SOR — computes threshold per ring, not globally
+function sorOnScan(s, sorK=8, stdMult=1.0) {
+  const n = s.points;
+  if (n < sorK+1) return {removed:0};
+
+  // Build grid hash for K-NN
+  let xn=Infinity,xx=-Infinity,yn=Infinity,yx=-Infinity,zn=Infinity,zx=-Infinity;
+  for(let i=0;i<n;i++){const x=s.pos[i*3],y=s.pos[i*3+1],z=s.pos[i*3+2];if(x<xn)xn=x;if(x>xx)xx=x;if(y<yn)yn=y;if(y>yx)yx=y;if(z<zn)zn=z;if(z>zx)zx=z;}
+  const cellSize=Math.max(xx-xn||1,yx-yn||1,zx-zn||1)/20, invCell=1/cellSize;
+  const grid=new Map();
+  for(let i=0;i<n;i++){const key=Math.floor(s.pos[i*3]*invCell)+','+Math.floor(s.pos[i*3+1]*invCell)+','+Math.floor(s.pos[i*3+2]*invCell);if(!grid.has(key))grid.set(key,[]);grid.get(key).push(i);}
+
+  // Compute mean K-NN distance for each point
+  const meanDists=new Float32Array(n);
+  for(let i=0;i<n;i++){
+    const px=s.pos[i*3],py=s.pos[i*3+1],pz=s.pos[i*3+2];
+    const gx=Math.floor(px*invCell),gy=Math.floor(py*invCell),gz=Math.floor(pz*invCell);
+    const kD=new Float32Array(sorK).fill(Infinity);
+    for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++)for(let dz=-1;dz<=1;dz++){
+      const cell=grid.get((gx+dx)+','+(gy+dy)+','+(gz+dz));if(!cell)continue;
+      for(let c=0;c<cell.length;c++){const j=cell[c];if(j===i)continue;
+        const ddx=s.pos[j*3]-px,ddy=s.pos[j*3+1]-py,ddz=s.pos[j*3+2]-pz;
+        const dist=Math.sqrt(ddx*ddx+ddy*ddy+ddz*ddz);
+        if(dist<kD[sorK-1]){kD[sorK-1]=dist;for(let q=sorK-1;q>0&&kD[q]<kD[q-1];q--){const t=kD[q];kD[q]=kD[q-1];kD[q-1]=t;}}
+      }
+    }
+    let sum=0,cnt=0;for(let k=0;k<sorK;k++)if(kD[k]<Infinity){sum+=kD[k];cnt++;}
+    meanDists[i]=cnt>0?sum/cnt:Infinity;
+  }
+
+  // Group points by tilt angle (round to nearest 1°) — each tilt = one ring
+  const rings = new Map();
+  for (let i = 0; i < n; i++) {
+    const tilt = Math.round(s.pt[i*2+1]); // tilt is at index i*2+1
+    if (!rings.has(tilt)) rings.set(tilt, []);
+    rings.get(tilt).push(i);
+  }
+
+  // Compute per-ring threshold
+  const keep = new Uint8Array(n); // 1 = keep, 0 = remove
+  let totalRings = 0;
+  for (const [tilt, indices] of rings) {
+    // Mean within this ring
+    let rm = 0, rc = 0;
+    for (const i of indices) {
+      if (meanDists[i] < Infinity) { rm += meanDists[i]; rc++; }
+    }
+    rm /= rc || 1;
+
+    // Std within this ring
+    let rv = 0;
+    for (const i of indices) {
+      if (meanDists[i] < Infinity) { const d = meanDists[i] - rm; rv += d*d; }
+    }
+    const ringThresh = rm + stdMult * Math.sqrt(rv / (rc || 1));
+
+    // Mark points to keep
+    for (const i of indices) {
+      if (meanDists[i] <= ringThresh) keep[i] = 1;
+    }
+    totalRings++;
+  }
+
+  // Compact buffers
+  let w = 0;
+  for (let i = 0; i < n; i++) {
+    if (keep[i]) {
+      if (w !== i) {
+        const i3=i*3,w3=w*3,i2=i*2,w2=w*2;
+        s.pos[w3]=s.pos[i3];s.pos[w3+1]=s.pos[i3+1];s.pos[w3+2]=s.pos[i3+2];
+        s.col[w3]=s.col[i3];s.col[w3+1]=s.col[i3+1];s.col[w3+2]=s.col[i3+2];
+        s.rng[w]=s.rng[i];s.sig[w]=s.sig[i];s.pt[w2]=s.pt[i2];s.pt[w2+1]=s.pt[i2+1];
+      }
+      w++;
+    }
+  }
+  const removed=n-w; s.points=w;
+  s.obj.geometry.setDrawRange(0,w);
+  const pa=s.obj.geometry.getAttribute('position');pa.array.set(s.pos.subarray(0,w*3));pa.needsUpdate=true;
+  const ca=s.obj.geometry.getAttribute('color');ca.array.set(s.col.subarray(0,w*3));ca.needsUpdate=true;
+  s.obj.geometry.computeBoundingSphere();
+  logLine('  SOR: '+totalRings+' rings, per-ring thresholds','info');
+  return {removed};
+}
+
+
+// ── WebSocket Backend Client ──
+let ws = null;
+let wsConnected = false;
+let pendingResolve = null;
+
+function connectBackend() {
+  if (ws && ws.readyState === WebSocket.OPEN) return;
+  try {
+    ws = new WebSocket('ws://localhost:8765');
+
+    ws.onopen = () => {
+      wsConnected = true;
+      if (DOM['backendStatus']) DOM['backendStatus'].textContent = 'Online';
+      if (DOM['backendDot']) DOM['backendDot'].style.background = 'var(--success)';
+      logLine('Backend connected','info');
+      updateTabs();
+      ws.send(JSON.stringify({cmd:'ping'}));
+    };
+
+    ws.onmessage = (ev) => {
+      const msg = JSON.parse(ev.data);
+      if (msg.cmd === 'pong') { logLine('Backend ready','info'); return; }
+      if (pendingResolve) {
+        const resolve = pendingResolve;
+        pendingResolve = null;
+        resolve(msg);
+      }
+    };
+
+    ws.onclose = () => {
+      wsConnected = false;
+      if (DOM['backendStatus']) DOM['backendStatus'].textContent = 'Offline';
+      if (DOM['backendDot']) DOM['backendDot'].style.background = 'var(--danger)';
+      updateTabs();
+      setTimeout(connectBackend, 5000);
+    };
+
+    ws.onerror = () => {};
+  } catch(e) {}
+}
+
+function sendBackend(msg) {
+  return new Promise((resolve, reject) => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      reject(new Error('Backend not connected — run: python backend_server.py'));
+      return;
+    }
+    pendingResolve = resolve;
+    ws.send(JSON.stringify(msg));
+  });
+}
+
+// Helper: pack a scan's typed arrays into a 2D array for the backend
+function packScan(pos, rng, pt, n) {
+  const arr = new Array(n);
+  for (let i = 0; i < n; i++) {
+    arr[i] = [pt[i*2], pt[i*2+1], rng[i], pos[i*3], pos[i*3+1], pos[i*3+2]];
+  }
+  return arr;
+}
+
+
+// ── SLAM Modal ──
+function runICP() { openSlamModal('icp'); }
+function runSLAM() { openSlamModal('slam'); }
+
+function openSlamModal(mode) {
+  if (scans.length < 2) { logLine('Save at least 2 scans first','info'); return; }
+  const modal = DOM['slamModal'];
+  if (!modal) return;
+
+  // Populate selects
+  const tgt = DOM['slamTarget'];
+  const src = DOM['slamSource'];
+  tgt.innerHTML = ''; src.innerHTML = '';
+  for (const s of scans) {
+    const rgb = `rgb(${Math.round(s.color[0]*255)},${Math.round(s.color[1]*255)},${Math.round(s.color[2]*255)})`;
+    tgt.innerHTML += `<option value="${s.id}">${s.name} (${s.points.toLocaleString()} pts)</option>`;
+    src.innerHTML += `<option value="${s.id}">${s.name} (${s.points.toLocaleString()} pts)</option>`;
+  }
+  // Default: target=first, source=second
+  if (scans.length >= 2) { tgt.value = scans[0].id; src.value = scans[1].id; }
+
+  DOM['slamMode'].value = mode || 'icp';
+  DOM['slamResult'].classList.remove('show');
+  updateSlamModeUI();
+  modal.classList.add('open');
+}
+
+function updateSlamModeUI() {
+  const mode = DOM['slamMode'] ? DOM['slamMode'].value : 'icp';
+  const icp = mode === 'icp';
+  if (DOM['slamTarget']) DOM['slamTarget'].disabled = !icp;
+  if (DOM['slamSource']) DOM['slamSource'].disabled = !icp;
+  if (DOM['slamTarget']) DOM['slamTarget'].parentElement.style.opacity = icp ? 1 : 0.35;
+  if (DOM['slamSource']) DOM['slamSource'].parentElement.style.opacity = icp ? 1 : 0.35;
+}
+
+function closeSlamModal() {
+  const modal = DOM['slamModal'];
+  if (modal) modal.classList.remove('open');
+}
+
+// Close modal on overlay click
+document.addEventListener('click', (e) => {
+  if (e.target.id === 'slamModal') closeSlamModal();
+});
+
+async function executeSLAM() {
+  const mode = DOM['slamMode'].value;
+  const tgtId = parseInt(DOM['slamTarget'].value);
+  const srcId = parseInt(DOM['slamSource'].value);
+
+  if (!wsConnected) { logLine('Start backend: python backend_server.py','info'); return; }
+
+  if (mode === 'icp') {
+    const target = scans.find(s => s.id === tgtId);
+    const source = scans.find(s => s.id === srcId);
+    if (!target || !source) return;
+    if (tgtId === srcId) { logLine('Select two different scans','info'); return; }
+
+    DOM['btnSlamRun'].disabled = true;
+    DOM['btnSlamRun'].textContent = 'Running...';
+    setStatus('scanning','ICP: '+source.name+' → '+target.name+'...');
+    logLine('ICP: '+source.name+' → '+target.name,'info');
+
+    try {
+      const result = await sendBackend({
+        cmd: 'icp',
+        source: packScan(source.pos, source.rng, source.pt, source.points),
+        target: packScan(target.pos, target.rng, target.pt, target.points)
+      });
+
+      // Update source geometry
+      for (let i = 0; i < source.points && i < result.aligned.length; i++) {
+        source.pos[i*3]=result.aligned[i][3]; source.pos[i*3+1]=result.aligned[i][4]; source.pos[i*3+2]=result.aligned[i][5];
+      }
+      const pa = source.obj.geometry.getAttribute('position');
+      pa.array.set(source.pos.subarray(0,source.points*3)); pa.needsUpdate=true;
+      source.obj.geometry.computeBoundingSphere();
+
+      // Show result in modal
+      const T = result.transform;
+      const R = T.slice(0,3).map(r => r.slice(0,3));
+      const t = [T[0][3], T[1][3], T[2][3]];
+      const disp = Math.sqrt(t[0]*t[0]+t[1]*t[1]+t[2]*t[2]);
+
+      DOM['slamResultContent'].innerHTML = `
+        <div class="mr-label">Rotation (3×3)</div>
+        <div class="mr-matrix">[${R[0].map(v=>v.toFixed(6)).join('  ')}]\n[${R[1].map(v=>v.toFixed(6)).join('  ')}]\n[${R[2].map(v=>v.toFixed(6)).join('  ')}]</div>
+        <div class="mr-label" style="margin-top:8px">Translation</div>
+        <div class="mr-val">X: ${t[0].toFixed(4)} mm   Y: ${t[1].toFixed(4)} mm   Z: ${t[2].toFixed(4)} mm</div>
+        <div class="mr-val" style="margin-top:4px">Displacement: ${disp.toFixed(4)} mm</div>
+        <div class="mr-label" style="margin-top:8px">Quality</div>
+        <div class="mr-val">RMSE: ${result.rmse.toFixed(4)} mm   Fitness: ${(result.fitness*100).toFixed(1)}%</div>
+        <div style="color:var(--text-muted);font-size:10px;margin-top:6px">${result.ms} ms</div>
+      `;
+      DOM['slamResult'].classList.add('show');
+      logLine('ICP: RMSE='+result.rmse.toFixed(4)+' disp='+disp.toFixed(2)+'mm','info');
+      setStatus('connected','ICP done — RMSE='+result.rmse.toFixed(4));
+    } catch(e) {
+      logLine('ICP error: '+e.message,'info');
+      setStatus('connected','ICP failed');
+    }
+    DOM['btnSlamRun'].disabled = false;
+    DOM['btnSlamRun'].textContent = 'Run Alignment';
+
+  } else {
+    // SLAM mode — align all scans
+    DOM['btnSlamRun'].disabled = true;
+    DOM['btnSlamRun'].textContent = 'Running...';
+    setStatus('scanning','SLAM: '+scans.length+' scans...');
+    logLine('SLAM: aligning '+scans.length+' scans','info');
+
+    try {
+      const allScans = scans.map(s => packScan(s.pos, s.rng, s.pt, s.points));
+      const result = await sendBackend({cmd:'slam', scans:allScans});
+
+      if (result.error) { logLine('SLAM error: '+result.error,'info'); setStatus('connected','SLAM failed'); return; }
+
+      for (let i=0;i<result.scans.length&&i<scans.length;i++){
+        const aligned=result.scans[i]; const scan=scans[i];
+        const n=Math.min(aligned.length,scan.points);
+        for(let j=0;j<n;j++){scan.pos[j*3]=aligned[j][3];scan.pos[j*3+1]=aligned[j][4];scan.pos[j*3+2]=aligned[j][5];}
+        if(aligned.length<scan.points){scan.points=aligned.length;scan.obj.geometry.setDrawRange(0,aligned.length);}
+        const pa=scan.obj.geometry.getAttribute('position');pa.array.set(scan.pos.subarray(0,scan.points*3));pa.needsUpdate=true;
+        scan.obj.geometry.computeBoundingSphere();
+      }
+
+      const lc = result.loop_closed ? '  Loop closure detected!' : '';
+      const rmses = result.pairwise_rmse ? result.pairwise_rmse.map(r=>r.toFixed(4)) : [];
+      let rows = '';
+      for(let i=0;i<rmses.length;i++) rows += `\nScan ${i+1} → Scan ${i+2}: RMSE = ${rmses[i]} mm`;
+
+      DOM['slamResultContent'].innerHTML = `
+        <div class="mr-label">Sequential Alignment</div>
+        <div class="mr-val">${scans.length} scans aligned${lc}</div>
+        <div class="mr-label" style="margin-top:8px">Pairwise RMSE</div>
+        <div class="mr-matrix">${rows || 'N/A'}</div>
+        ${result.lc_rmse !== null ? '<div class="mr-val" style="margin-top:4px">Loop closure RMSE: '+result.lc_rmse.toFixed(4)+' mm</div>' : ''}
+        <div style="color:var(--text-muted);font-size:10px;margin-top:6px">${result.ms} ms</div>
+      `;
+      DOM['slamResult'].classList.add('show');
+      logLine('SLAM done: '+scans.length+' scans'+lc+' — '+result.ms+'ms','info');
+      setStatus('connected','SLAM: '+scans.length+' scans aligned');
+      updateTabs();
+    } catch(e) {
+      logLine('SLAM error: '+e.message,'info');
+      setStatus('connected','SLAM failed');
+    }
+    DOM['btnSlamRun'].disabled = false;
+    DOM['btnSlamRun'].textContent = 'Run Alignment';
+  }
+}
+
+
+// ── Excel Export — one sheet per scan ──
+function exportXLSX() {
+  if (scans.length === 0 && pointCount === 0) {
+    logLine('No data to export','info');
+    return;
+  }
+
+  if (typeof XLSX === 'undefined') {
+    logLine('SheetJS not loaded — exporting CSV per scan instead','info');
+    exportMultiCSV();
+    return;
+  }
+
+  const wb = XLSX.utils.book_new();
+
+  // One sheet per saved scan
+  for (const s of scans) {
+    const header = s.hasSigma ? ['pan','tilt','range_mm','x','y','z','sigma'] : ['pan','tilt','range_mm','x','y','z'];
+    const rows = [header];
+    for (let i = 0; i < s.points; i++) {
+      const row = [
+        +s.pt[i*2].toFixed(1), +s.pt[i*2+1].toFixed(1), +s.rng[i].toFixed(1),
+        +s.pos[i*3].toFixed(4), +s.pos[i*3+1].toFixed(4), +s.pos[i*3+2].toFixed(4)
+      ];
+      if (s.hasSigma) row.push(+s.sig[i].toFixed(0));
+      rows.push(row);
+    }
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), s.name);
+  }
+
+  // Current buffer as a sheet if has points
+  if (pointCount > 0) {
+    let curHasSig = false;
+    for (let i = 0; i < pointCount; i++) { if (sigmaBuffer[i] > 0) { curHasSig = true; break; } }
+    const header = curHasSig ? ['pan','tilt','range_mm','x','y','z','sigma'] : ['pan','tilt','range_mm','x','y','z'];
+    const rows = [header];
+    for (let i = 0; i < pointCount; i++) {
+      const row = [
+        +panTiltBuffer[i*2].toFixed(1), +panTiltBuffer[i*2+1].toFixed(1), +rangeBuffer[i].toFixed(1),
+        +posBuffer[i*3].toFixed(4), +posBuffer[i*3+1].toFixed(4), +posBuffer[i*3+2].toFixed(4)
+      ];
+      if (curHasSig) row.push(+sigmaBuffer[i].toFixed(0));
+      rows.push(row);
+    }
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Current');
+  }
+
+  // Summary sheet
+  const summary = [['Scan','Points','X min','X max','Y min','Y max','Z min','Z max','Range min','Range max']];
+  for (const s of scans) {
+    let xn=Infinity,xx=-Infinity,yn=Infinity,yx=-Infinity,zn=Infinity,zx=-Infinity,rn=Infinity,rx=-Infinity;
+    for (let i = 0; i < s.points; i++) {
+      const x=s.pos[i*3],y=s.pos[i*3+1],z=s.pos[i*3+2],r=s.rng[i];
+      if(x<xn)xn=x;if(x>xx)xx=x;if(y<yn)yn=y;if(y>yx)yx=y;
+      if(z<zn)zn=z;if(z>zx)zx=z;if(r<rn)rn=r;if(r>rx)rx=r;
+    }
+    summary.push([s.name,s.points,+xn.toFixed(1),+xx.toFixed(1),+yn.toFixed(1),+yx.toFixed(1),+zn.toFixed(1),+zx.toFixed(1),+rn.toFixed(0),+rx.toFixed(0)]);
+  }
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'Summary');
+
+  const fname = 'tfd_scans_'+new Date().toISOString().slice(0,19).replace(/[:-]/g,'')+'.xlsx';
+  XLSX.writeFile(wb, fname);
+  logLine('Exported '+scans.length+' scans → '+fname,'info');
+}
+
+function exportMultiCSV() {
+  for (const s of scans) {
+    const parts = [s.hasSigma ? 'pan,tilt,range_mm,x,y,z,sigma\n' : 'pan,tilt,range_mm,x,y,z\n'];
+    for (let i = 0; i < s.points; i++) {
+      let line = s.pt[i*2].toFixed(1)+','+s.pt[i*2+1].toFixed(1)+','+s.rng[i].toFixed(1)+','+
+                 s.pos[i*3].toFixed(4)+','+s.pos[i*3+1].toFixed(4)+','+s.pos[i*3+2].toFixed(4);
+      if (s.hasSigma) line += ','+s.sig[i].toFixed(0);
+      parts.push(line+'\n');
+    }
+    const b = new Blob(parts,{type:'text/csv'}), u = URL.createObjectURL(b), a = document.createElement('a');
+    a.href=u; a.download=s.name.replace(/\s+/g,'_')+'.csv'; a.click(); URL.revokeObjectURL(u);
+  }
+  logLine('Exported '+scans.length+' CSV files','info');
+}
+
+
+// ============================================================================
+// EDGE PIPELINE — Step-by-step visualization
+// ============================================================================
+
+let pipelineStage = 0;
+let edgeLineObjects = [];
+
+function clearEdgeLines() {
+  for (const obj of edgeLineObjects) { scene.remove(obj); obj.geometry.dispose(); obj.material.dispose(); }
+  edgeLineObjects = [];
+}
+
+// ── Init ──
+cacheDOMRefs();
+initScene();
+updateSensorDisplay();
+connectBackend();
+updateTabs();
+</script>
+</body>
+</html>
