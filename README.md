@@ -131,11 +131,9 @@ Raw Scan → SOR (Ring-Adaptive) → Sigma Filter → Range Consistency
 
 ---
 
-## Team
+##BY
 
-- **Taranpreet Singh** — Firmware, software, PCB design
-- **Bastiaan van de Werken** — Hardware integration
-- **Manjinder Singh** — Testing and assembly
+- **Taranpreet Singh** — Firmware, software, PCB design,  Hardware integration , Testing and assembly
 
 SAIT — Electronics Engineering Technology — Capstone 2026
 
